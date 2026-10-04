@@ -433,7 +433,7 @@ export class Monster {
     }
   }
 
-  update(delta, playerPos, playerNoise, playerLightingMonster) {
+  update(delta, playerPos, playerNoise, playerLightingMonster, camera = null) {
     if (this.state === MONSTER_STATE.KILLING) return; // Managed by jumpscare sequence
 
     const distToPlayer = this.group.position.distanceTo(playerPos);
@@ -539,9 +539,17 @@ export class Monster {
     if (this.stepTimer >= stepInterval) {
       this.stepTimer = 0;
       if (this.sound) {
-        const toMonster = new THREE.Vector3().subVectors(this.group.position, playerPos);
-        const panAngle = Math.atan2(toMonster.x, toMonster.z);
-        this.sound.playMonsterStep(distToPlayer, Math.sin(panAngle));
+        let stereoPan = 0;
+        if (camera) {
+          const toMonster = new THREE.Vector3().subVectors(this.group.position, playerPos);
+          toMonster.y = 0;
+          if (toMonster.lengthSq() > 0.001) {
+            toMonster.normalize();
+            const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            stereoPan = Math.max(-1, Math.min(1, toMonster.dot(camRight)));
+          }
+        }
+        this.sound.playMonsterStep(distToPlayer, stereoPan);
       }
     }
   }

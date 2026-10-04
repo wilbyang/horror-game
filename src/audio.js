@@ -212,63 +212,97 @@ export class SoundEngine {
     noiseSource.stop(now + noiseLength);
   }
 
-  // Monster footsteps (spatially positioned & heavy dragging)
+  // Monster footsteps (spatially positioned, heavy thud + sharp talon click + close breath)
   playMonsterStep(distance, panAngle) {
     if (!this.ctx || this.ctx.state !== 'running') return;
     const now = this.ctx.currentTime;
 
-    // Attenuation based on distance (audible up to 45m)
-    const maxDist = 45;
+    // Attenuation based on distance (audible up to 38m)
+    const maxDist = 38;
     if (distance > maxDist) return;
-    const vol = Math.pow(1 - distance / maxDist, 1.8) * 0.9;
-    if (vol < 0.01) return;
+
+    // Rich volume curve: clearly audible when nearby
+    const normDist = distance / maxDist;
+    const vol = Math.pow(1 - normDist, 1.2) * 1.25;
+    if (vol < 0.02) return;
 
     const panner = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
     if (panner) {
       panner.pan.setValueAtTime(Math.max(-1, Math.min(1, panAngle)), now);
     }
-
-    // Heavy footstep impact
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(48 + Math.random() * 12, now);
-    osc.frequency.exponentialRampToValueAtTime(20, now + 0.22);
-
-    gain.gain.setValueAtTime(vol * 1.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-
-    // Dragging gravel / bone scrape
-    const bufLen = Math.floor(this.ctx.sampleRate * 0.18);
-    const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.5;
-    }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buf;
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(320, now);
-
-    const noiseGain = this.ctx.createGain();
-    noiseGain.gain.setValueAtTime(vol * 0.5, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
     const dest = panner ? panner : this.masterGain;
     if (panner) panner.connect(this.masterGain);
 
-    osc.connect(gain);
-    gain.connect(dest);
-    noise.connect(filter);
-    filter.connect(noiseGain);
-    noiseGain.connect(dest);
+    // 1. Heavy physical floor impact thud (audible on all speakers: 150Hz -> 55Hz)
+    const thud = this.ctx.createOscillator();
+    const thudGain = this.ctx.createGain();
+    thud.type = 'sawtooth';
+    thud.frequency.setValueAtTime(145 + Math.random() * 20, now);
+    thud.frequency.exponentialRampToValueAtTime(50, now + 0.24);
 
-    osc.start(now);
-    osc.stop(now + 0.25);
-    noise.start(now);
-    noise.stop(now + 0.18);
+    const thudFilter = this.ctx.createBiquadFilter();
+    thudFilter.type = 'lowpass';
+    thudFilter.frequency.setValueAtTime(260, now);
+    thudFilter.Q.setValueAtTime(2.2, now);
+
+    thudGain.gain.setValueAtTime(vol * 0.95, now);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    thud.connect(thudFilter);
+    thudFilter.connect(thudGain);
+    thudGain.connect(dest);
+    thud.start(now);
+    thud.stop(now + 0.28);
+
+    // 2. Sharp bone talon clicking on flagstones (1100Hz - 1600Hz crisp click)
+    const clickBufLen = Math.floor(this.ctx.sampleRate * 0.08);
+    const clickBuf = this.ctx.createBuffer(1, clickBufLen, this.ctx.sampleRate);
+    const cData = clickBuf.getChannelData(0);
+    for (let i = 0; i < clickBufLen; i++) {
+      cData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (clickBufLen * 0.18));
+    }
+    const clickSource = this.ctx.createBufferSource();
+    clickSource.buffer = clickBuf;
+
+    const clickFilter = this.ctx.createBiquadFilter();
+    clickFilter.type = 'bandpass';
+    clickFilter.frequency.setValueAtTime(1250 + Math.random() * 350, now);
+    clickFilter.Q.setValueAtTime(3.8, now);
+
+    const clickGain = this.ctx.createGain();
+    clickGain.gain.setValueAtTime(vol * 0.7, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    clickSource.connect(clickFilter);
+    clickFilter.connect(clickGain);
+    clickGain.connect(dest);
+    clickSource.start(now);
+
+    // 3. Low guttural breath/snarl when close (< 18m)
+    if (distance < 18) {
+      const breathBufLen = Math.floor(this.ctx.sampleRate * 0.28);
+      const breathBuf = this.ctx.createBuffer(1, breathBufLen, this.ctx.sampleRate);
+      const bData = breathBuf.getChannelData(0);
+      for (let i = 0; i < breathBufLen; i++) {
+        bData[i] = (Math.random() * 2 - 1) * 0.45;
+      }
+      const breathSource = this.ctx.createBufferSource();
+      breathSource.buffer = breathBuf;
+
+      const breathFilter = this.ctx.createBiquadFilter();
+      breathFilter.type = 'lowpass';
+      breathFilter.frequency.setValueAtTime(360, now);
+
+      const breathGain = this.ctx.createGain();
+      const breathVol = (1 - distance / 18) * 0.5;
+      breathGain.gain.setValueAtTime(breathVol, now);
+      breathGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+      breathSource.connect(breathFilter);
+      breathFilter.connect(breathGain);
+      breathGain.connect(dest);
+      breathSource.start(now);
+    }
   }
 
   // Monster growl / screech

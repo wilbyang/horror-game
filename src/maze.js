@@ -126,7 +126,7 @@ export class Maze {
         if (this.grid[z][x] === 0) {
           // Distance from spawn
           const distFromSpawn = Math.hypot(x - midOdd, z - midOdd);
-          if (distFromSpawn > 5) {
+          if (distFromSpawn > 3) {
             // Count wall neighbors
             let wallCount = 0;
             if (this.grid[z - 1][x] === 1) wallCount++;

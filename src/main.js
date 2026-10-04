@@ -158,10 +158,10 @@ class Game {
     this.keysCount = 0;
     this.ui.updateKeys(this.collectedKeys);
 
-    // Determine maze size by difficulty
-    let mazeDimension = 29;
-    if (this.ui.selectedDifficulty === 'easy') mazeDimension = 23;
-    if (this.ui.selectedDifficulty === 'hard') mazeDimension = 33;
+    // Determine maze size by difficulty (balanced compact & challenging)
+    let mazeDimension = 21;
+    if (this.ui.selectedDifficulty === 'easy') mazeDimension = 17;
+    if (this.ui.selectedDifficulty === 'hard') mazeDimension = 25;
 
     // Generate Maze
     this.maze = new Maze(mazeDimension);
@@ -296,12 +296,18 @@ class Game {
     const isLightingMonster = this.player.isLightingObject(this.monster.group.position);
     const playerNoise = this.player.getNoiseLevel();
 
-    // Update Monster AI
-    this.monster.update(delta, playerPos, playerNoise, isLightingMonster);
+    // Update Monster AI with camera for spatial 3D audio
+    this.monster.update(delta, playerPos, playerNoise, isLightingMonster, this.camera);
 
     // Distance to monster
     const monsterDist = this.monster.group.position.distanceTo(playerPos);
     const isChasing = (this.monster.state === MONSTER_STATE.CHASE);
+
+    // Subtle physical ground rumble when heavy monster is stomping nearby
+    if (monsterDist < 12 && (isChasing || this.monster.state === MONSTER_STATE.INVESTIGATE)) {
+      const rumble = (1 - monsterDist / 12) * 0.016;
+      this.camera.position.y += (Math.random() - 0.5) * rumble;
+    }
 
     // Update Threat & Heartbeat
     const threat = this.ui.updateThreat(monsterDist, isChasing);
