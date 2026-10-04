@@ -157,6 +157,30 @@
       height: 100%;
       background: #ef4444;
       box-shadow: 0 0 6px #ef4444;
+      z-index: 2;
+    }
+    #compass-key-markers {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .compass-key-marker {
+      position: absolute;
+      top: 2px;
+      transform: translateX(-50%);
+      font-size: 10px;
+      font-weight: bold;
+      padding: 1px 6px;
+      border-radius: 3px;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      text-shadow: 0 0 8px currentColor;
+      border: 1px solid currentColor;
+      background: rgba(10, 10, 16, 0.88);
     }
 
     .key-indicator-panel {
@@ -633,6 +657,7 @@
           <span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span>
         </div>
         <div class="compass-center-marker"></div>
+        <div id="compass-key-markers"></div>
       </div>
 
       <div class="key-indicator-panel">

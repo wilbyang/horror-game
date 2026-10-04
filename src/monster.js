@@ -25,10 +25,10 @@ export class Monster {
     this.currentPath = [];
     this.pathIndex = 0;
 
-    // Movement speeds
-    this.patrolSpeed = 2.6;
-    this.chaseSpeed = 5.2;
-    this.investigateSpeed = 3.6;
+    // Movement speeds (slower than player walkSpeed of 4.4)
+    this.patrolSpeed = 1.9;
+    this.chaseSpeed = 3.6;
+    this.investigateSpeed = 2.6;
 
     // Detection timers
     this.repathTimer = 0;

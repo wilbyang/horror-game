@@ -60,9 +60,32 @@ export class KeyItem {
     tooth2.position.set(0.1, -0.48, 0);
     this.group.add(tooth2);
 
-    // Glowing point light to illuminate dark corridor
-    this.light = new THREE.PointLight(this.colorHex, 2.2, 9.0, 1.5);
+    // Powerful glowing point light to illuminate long corridors
+    this.light = new THREE.PointLight(this.colorHex, 4.8, 26.0, 1.2);
     this.group.add(this.light);
+
+    // Vertical ethereal light beacon column from floor to ceiling
+    const beaconGeo = new THREE.CylinderGeometry(0.15, 0.48, WALL_HEIGHT, 16, 1, true);
+    const beaconMat = new THREE.MeshBasicMaterial({
+      color: this.colorHex,
+      transparent: true,
+      opacity: 0.38,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    this.beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
+    this.beaconMesh.position.y = (WALL_HEIGHT / 2) - this.pos.y;
+    this.group.add(this.beaconMesh);
+
+    // Floor runic circle
+    const runeFloor = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 1.4, 32),
+      new THREE.MeshBasicMaterial({ color: this.colorHex, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false })
+    );
+    runeFloor.position.y = -this.pos.y + 0.05;
+    runeFloor.rotation.x = -Math.PI / 2;
+    this.group.add(runeFloor);
+    this.runeFloor = runeFloor;
 
     // Floating pedestal/altar beneath the key
     const pedestalGeo = new THREE.CylinderGeometry(0.35, 0.45, 0.65, 8);
@@ -85,7 +108,12 @@ export class KeyItem {
     // Gentle floating and rotation
     this.group.rotation.y = time * 1.5;
     this.group.position.y = this.pos.y + Math.sin(time * 2.5) * 0.1;
-    this.light.intensity = 2.0 + Math.sin(time * 4) * 0.4;
+    this.light.intensity = 4.2 + Math.sin(time * 3.5) * 0.8;
+
+    if (this.beaconMesh) {
+      this.beaconMesh.rotation.y = -time * 0.8;
+      this.beaconMesh.material.opacity = 0.28 + Math.sin(time * 3) * 0.12;
+    }
   }
 }
 

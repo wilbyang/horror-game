@@ -185,13 +185,13 @@ class Game {
     this.monster = new Monster(this.scene, this.maze, this.sound);
     this.spawnMonsterFarAway();
 
-    // Adjust monster difficulty
+    // Adjust monster difficulty (always keeping monster slower than player's 4.4 walkSpeed)
     if (this.ui.selectedDifficulty === 'easy') {
-      this.monster.patrolSpeed = 2.2;
-      this.monster.chaseSpeed = 4.7;
+      this.monster.patrolSpeed = 1.6;
+      this.monster.chaseSpeed = 3.1;
     } else if (this.ui.selectedDifficulty === 'hard') {
-      this.monster.patrolSpeed = 3.0;
-      this.monster.chaseSpeed = 5.7;
+      this.monster.patrolSpeed = 2.1;
+      this.monster.chaseSpeed = 3.9;
     }
 
     // Hide modals and show HUD
@@ -319,7 +319,8 @@ class Game {
       this.player.isExhausted,
       this.player.battery
     );
-    this.ui.updateCompass(this.getPlayerYaw());
+    // Update Compass with directional key markers & exit marker
+    this.ui.updateCompass(this.getPlayerYaw(), playerPos, this.keys, this.exitGate);
 
     // Update Sonar Radar
     this.ui.updateSonar(
@@ -339,11 +340,16 @@ class Game {
 
   updateKeys(time, playerPos) {
     let nearInteractable = false;
+    let nearestKeyDist = Infinity;
+
     for (const key of this.keys) {
       key.update(time);
 
       if (!key.collected) {
         const dist = key.group.position.distanceTo(playerPos);
+        if (dist < nearestKeyDist) {
+          nearestKeyDist = dist;
+        }
 
         // Check if looking near key
         if (dist < 3.5) {
@@ -377,6 +383,11 @@ class Game {
           }
         }
       }
+    }
+
+    // Play proximity harmonic audio chime when near an uncollected key
+    if (nearestKeyDist < 24) {
+      this.sound.updateKeyProximity(nearestKeyDist);
     }
 
     if (this.exitGate && this.exitGate.pos.distanceTo(playerPos) < 4.0) {

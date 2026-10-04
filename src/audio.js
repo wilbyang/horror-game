@@ -373,6 +373,35 @@ export class SoundEngine {
     osc.stop(now + 0.04);
   }
 
+  // Gentle harmonic chime ping when close to an ancient key
+  updateKeyProximity(distance) {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime;
+    if (distance > 22) return;
+
+    if (!this.lastKeyPingTime || (now - this.lastKeyPingTime > 2.4)) {
+      this.lastKeyPingTime = now;
+      const vol = (1 - distance / 22) * 0.4;
+
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+
+      // Pitch rises as you draw closer: 659Hz (E5) up to 1046Hz (C6)
+      const freq = 659.25 + (1 - distance / 22) * 387;
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(vol, now + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(now);
+      osc.stop(now + 1.1);
+    }
+  }
+
   // Key pickup chime
   playKeyPickup() {
     if (!this.ctx || this.ctx.state !== 'running') return;

@@ -7,6 +7,7 @@ export class UIController {
 
     // Compass
     this.compassTape = document.getElementById('compass-tape');
+    this.compassMarkersContainer = document.getElementById('compass-key-markers');
 
     // Key Slots
     this.slotRuby = document.getElementById('slot-ruby');
@@ -123,7 +124,7 @@ export class UIController {
     }, duration);
   }
 
-  updateCompass(yawRadians) {
+  updateCompass(yawRadians, playerPos = null, keys = [], exitGate = null) {
     // Convert yaw to 0..360 degrees where 0 = North (-Z), 90 = East (+X)
     let degrees = (yawRadians * (180 / Math.PI)) % 360;
     if (degrees < 0) degrees += 360;
@@ -132,6 +133,48 @@ export class UIController {
     const pxPerDegree = 60 / 45; // 1.3333...
     const offset = -30 - (degrees * pxPerDegree);
     this.compassTape.style.transform = `translateX(${offset}px)`;
+
+    // Update floating directional key / exit markers on the compass tape
+    if (this.compassMarkersContainer && playerPos) {
+      let markersHtml = '';
+
+      // Check uncollected keys
+      keys.forEach(k => {
+        if (!k.collected) {
+          const dx = k.pos.x - playerPos.x;
+          const dz = k.pos.z - playerPos.z;
+          const keyAngle = Math.atan2(dx, -dz);
+          let diff = keyAngle - yawRadians;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+
+          const pxOffset = diff * (180 / Math.PI) * pxPerDegree;
+          if (Math.abs(pxOffset) < 125) {
+            const hex = '#' + k.colorHex.toString(16).padStart(6, '0');
+            const label = k.id.toUpperCase();
+            markersHtml += `<div class="compass-key-marker" style="left: calc(50% + ${pxOffset}px); color: ${hex}; border-color: ${hex};">◆ ${label}</div>`;
+          }
+        }
+      });
+
+      // If all keys collected, point to Exit Gate
+      const allCollected = keys.length > 0 && keys.every(k => k.collected);
+      if (allCollected && exitGate) {
+        const dx = exitGate.pos.x - playerPos.x;
+        const dz = exitGate.pos.z - playerPos.z;
+        const exitAngle = Math.atan2(dx, -dz);
+        let diff = exitAngle - yawRadians;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+
+        const pxOffset = diff * (180 / Math.PI) * pxPerDegree;
+        if (Math.abs(pxOffset) < 125) {
+          markersHtml += `<div class="compass-key-marker" style="left: calc(50% + ${pxOffset}px); color: #10b981; border-color: #10b981;">★ EXIT</div>`;
+        }
+      }
+
+      this.compassMarkersContainer.innerHTML = markersHtml;
+    }
   }
 
   updateBars(staminaPercent, isExhausted, batteryPercent) {
@@ -194,7 +237,7 @@ export class UIController {
 
     this.sonarActive = true;
     this.sonarTimer = 2.8;
-    this.sonarCooldown = 6.0;
+    this.sonarCooldown = 3.0;
     this.sonarWrapper.style.display = 'flex';
     return true;
   }

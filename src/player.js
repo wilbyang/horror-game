@@ -21,8 +21,8 @@ export class Player {
     // Velocity & physics
     this.velocity = new THREE.Vector3();
     this.direction = new THREE.Vector3();
-    this.walkSpeed = 4.2;
-    this.sprintSpeed = 7.6;
+    this.walkSpeed = 4.4;
+    this.sprintSpeed = 7.8;
 
     // Stamina
     this.maxStamina = 100;
