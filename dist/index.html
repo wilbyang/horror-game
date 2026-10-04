@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Labyrinth of Shadows - Three.js Horror Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Cinzel:wght@600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>*{box-sizing:border-box;-webkit-user-select:none;user-select:none;margin:0;padding:0}html,body{color:#e2e8f0;background-color:#020204;width:100%;height:100%;font-family:Share Tech Mono,monospace,sans-serif;overflow:hidden}#game-canvas{z-index:1;width:100%;height:100%;display:block;position:absolute;top:0;left:0}#vignette-overlay{pointer-events:none;z-index:5;background:radial-gradient(circle,#0000 40%,#000000d9 100%);width:100%;height:100%;transition:background .3s;position:absolute;top:0;left:0;box-shadow:inset 0 0 100px #000000e6}#danger-overlay{pointer-events:none;z-index:6;opacity:0;background:radial-gradient(circle,#0000 30%,#b4000080 80%,#460000f2 100%);width:100%;height:100%;transition:opacity .2s;position:absolute;top:0;left:0;box-shadow:inset 0 0 120px #f009}#grain-overlay{pointer-events:none;z-index:7;opacity:.12;background-image:repeating-radial-gradient(#fff 0 .0001%,#000 0 .0002%);background-size:150px 150px;width:100%;height:100%;position:absolute;top:0;left:0}#crosshair{pointer-events:none;z-index:10;background:#ffffffa6;border-radius:50%;width:6px;height:6px;transition:transform .15s,background-color .2s;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 8px #fffc}#crosshair.interact{background:#f59e0b;transform:translate(-50%,-50%)scale(2.2);box-shadow:0 0 14px #f59e0b}#hud{pointer-events:none;z-index:10;width:100%;height:100%;display:none;position:absolute;top:0;left:0}.top-bar{flex-direction:column;align-items:center;gap:8px;display:flex;position:absolute;top:20px;left:50%;transform:translate(-50%)}.compass-container{-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);background:#0a0a0eb3;border:1px solid #ffffff26;border-radius:4px;width:280px;height:28px;position:relative;overflow:hidden}.compass-tape{letter-spacing:2px;color:#94a3b8;white-space:nowrap;align-items:center;height:100%;font-size:11px;transition:transform 50ms linear;display:flex;position:absolute;top:0;left:50%}.compass-tape span{text-align:center;flex-shrink:0;width:60px;display:inline-block}.compass-center-marker{background:#ef4444;width:2px;height:100%;position:absolute;top:0;left:50%;transform:translate(-50%);box-shadow:0 0 6px #ef4444}.key-indicator-panel{-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);background:#0f0f14d9;border:1px solid #ffffff1f;border-radius:6px;align-items:center;gap:16px;padding:8px 18px;display:flex;box-shadow:0 4px 20px #0009}.key-slot{color:#64748b;align-items:center;gap:8px;font-size:13px;transition:color .3s,text-shadow .3s;display:flex}.key-icon{background:#0f172a;border:1px solid #475569;border-radius:4px;justify-content:center;align-items:center;width:24px;height:24px;transition:all .3s cubic-bezier(.34,1.56,.64,1);display:flex}.key-icon svg{fill:#475569;width:16px;height:16px;transition:fill .3s}.key-slot.collected.ruby{color:#f87171;text-shadow:0 0 8px #ef444499}.key-slot.collected.ruby .key-icon{background:#ef444440;border-color:#ef4444;transform:scale(1.1);box-shadow:0 0 12px #ef444499}.key-slot.collected.ruby svg{fill:#ef4444}.key-slot.collected.sapphire{color:#60a5fa;text-shadow:0 0 8px #3b82f699}.key-slot.collected.sapphire .key-icon{background:#3b82f640;border-color:#3b82f6;transform:scale(1.1);box-shadow:0 0 12px #3b82f699}.key-slot.collected.sapphire svg{fill:#3b82f6}.key-slot.collected.topaz{color:#fbbf24;text-shadow:0 0 8px #f59e0b99}.key-slot.collected.topaz .key-icon{background:#f59e0b40;border-color:#f59e0b;transform:scale(1.1);box-shadow:0 0 12px #f59e0b99}.key-slot.collected.topaz svg{fill:#f59e0b}.bottom-bar{flex-direction:column;gap:12px;display:flex;position:absolute;bottom:25px;left:30px}.bar-row{letter-spacing:1px;text-transform:uppercase;align-items:center;gap:12px;font-size:12px;display:flex}.bar-label{color:#94a3b8;width:80px}.bar-outer{background:#0f172acc;border:1px solid #fff3;border-radius:2px;width:180px;height:10px;padding:1px;overflow:hidden}.bar-fill{width:100%;height:100%;transition:width .1s linear,background-color .3s}#stamina-fill{background:linear-gradient(90deg,#10b981,#34d399);box-shadow:0 0 8px #10b98180}#stamina-fill.exhausted{background:linear-gradient(90deg,#ef4444,#f87171);box-shadow:0 0 8px #ef4444b3}#battery-fill{background:linear-gradient(90deg,#3b82f6,#60a5fa);box-shadow:0 0 8px #3b82f680}.threat-indicator{-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);background:#0f0f14bf;border:1px solid #ffffff1a;border-radius:6px;align-items:center;gap:12px;padding:10px 16px;display:flex;position:absolute;bottom:25px;right:30px}#heart-icon{fill:#475569;transform-origin:50%;width:22px;height:22px;transition:fill .3s}#heart-icon.beating{animation:.7s infinite pulse}#heart-icon.danger{fill:#ef4444;filter:drop-shadow(0 0 8px #ef4444);animation:.38s infinite rapidPulse}@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.28)}to{transform:scale(1)}}@keyframes rapidPulse{0%{transform:scale(1)}50%{transform:scale(1.42)}to{transform:scale(1)}}#threat-text{color:#94a3b8;font-size:13px}#notification-box{letter-spacing:1px;color:#f1f5f9;opacity:0;pointer-events:none;text-align:center;background:#0a0a0feb;border:1px solid #fff3;border-radius:4px;max-width:80%;padding:10px 24px;font-size:14px;transition:opacity .3s,transform .3s;position:absolute;top:90px;left:50%;transform:translate(-50%);box-shadow:0 4px 20px #000c}#notification-box.show{opacity:1;transform:translate(-50%)translateY(0)}.controls-hint{color:#64748b;letter-spacing:1px;gap:16px;font-size:11px;display:flex;position:absolute;bottom:8px;left:50%;transform:translate(-50%)}#sonar-canvas{z-index:12;pointer-events:none;background:radial-gradient(circle,#061812d9 0%,#020608f2 90%);border:2px solid #10b981;border-radius:50%;width:440px;height:440px;display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 30px #10b98166}#sonar-label{color:#34d399;letter-spacing:2px;text-transform:uppercase;font-size:11px;position:absolute;bottom:20px;left:50%;transform:translate(-50%)}.modal-screen{z-index:100;text-align:center;background:radial-gradient(circle,#0f0f18f2 0%,#030306fc 100%);flex-direction:column;justify-content:center;align-items:center;width:100%;height:100%;padding:30px;display:flex;position:absolute;top:0;left:0}.game-title{letter-spacing:8px;color:#f1f5f9;text-shadow:0 0 30px #dc2626cc,0 0 60px #b91c1c66;text-transform:uppercase;margin-bottom:8px;font-family:Cinzel,serif;font-size:56px;font-weight:900}.game-subtitle{color:#94a3b8;letter-spacing:4px;text-transform:uppercase;margin-bottom:36px;font-family:Share Tech Mono,monospace;font-size:16px}.story-card{color:#cbd5e1;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);background:#14141e99;border:1px solid #ffffff1a;border-radius:8px;max-width:580px;margin-bottom:30px;padding:24px;font-size:14px;line-height:1.6}.story-card strong{color:#ef4444}.key-objective-preview{justify-content:center;gap:24px;margin-top:14px;display:flex}.key-preview-item{align-items:center;gap:6px;font-size:12px;display:flex}.btn-group{flex-direction:column;align-items:center;gap:16px;display:flex}.btn-primary{color:#fff;letter-spacing:3px;cursor:pointer;text-transform:uppercase;background:linear-gradient(135deg,#b91c1c,#991b1b);border:1px solid #ef4444;border-radius:4px;padding:16px 48px;font-family:Cinzel,serif;font-size:20px;font-weight:800;transition:all .25s;box-shadow:0 0 25px #dc262680}.btn-primary:hover{background:linear-gradient(135deg,#dc2626,#b91c1c);transform:translateY(-2px)scale(1.03);box-shadow:0 0 35px #ef4444cc}.btn-primary:active{transform:translateY(1px)}.difficulty-select{gap:12px;margin-bottom:24px;display:flex}.diff-btn{color:#94a3b8;cursor:pointer;background:#1e293b99;border:1px solid #ffffff26;border-radius:4px;padding:8px 18px;font-family:Share Tech Mono,monospace;font-size:13px;transition:all .2s}.diff-btn.active{color:#fca5a5;background:#dc26264d;border-color:#ef4444;box-shadow:0 0 12px #ef444466}.controls-grid{text-align:left;color:#94a3b8;grid-template-columns:repeat(2,1fr);gap:12px 30px;margin-top:20px;font-size:13px;display:grid}.key-badge{color:#f8fafc;background:#1e293b;border:1px solid #475569;border-radius:3px;margin-right:6px;padding:2px 7px;font-weight:700;display:inline-block}#jumpscare-overlay{z-index:90;pointer-events:none;background:#000;width:100%;height:100%;display:none;position:absolute;top:0;left:0;overflow:hidden}#jumpscare-canvas{width:100%;height:100%;display:block}#jumpscare-blood{mix-blend-mode:multiply;opacity:.9;background:radial-gradient(circle,#0000 20%,#820000cc 70%,#400 100%);width:100%;height:100%;position:absolute;top:0;left:0}.result-stats{gap:30px;margin:20px 0 30px;display:flex}.stat-box{background:#0f172ab3;border:1px solid #ffffff1a;border-radius:6px;padding:12px 24px}.stat-number{color:#f1f5f9;margin-bottom:4px;font-size:28px;font-weight:700}.stat-label{color:#64748b;letter-spacing:1px;font-size:11px}.audio-notice{color:#ef4444;letter-spacing:1px;align-items:center;gap:6px;margin-top:16px;font-size:12px;display:flex}</style>
+  <script type="module" crossorigin src="/assets/index-Bmplokir.js"></script>
+</head>
+<body>
+  <!-- 3D Canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- Screen atmosphere shaders / overlays -->
+  <div id="vignette-overlay"></div>
+  <div id="danger-overlay"></div>
+  <div id="grain-overlay"></div>
+
+  <!-- Reticle -->
+  <div id="crosshair"></div>
+
+  <!-- Sonar Radar Map (Toggled by M or TAB) -->
+  <div id="sonar-canvas-wrapper" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; z-index:12; pointer-events:none; display:flex; align-items:center; justify-content:center;">
+    <div style="position:relative;">
+      <canvas id="sonar-canvas" width="400" height="400"></canvas>
+      <div id="sonar-label">ECHOLOCATION SCAN [RECHARGING]</div>
+    </div>
+  </div>
+
+  <!-- In-Game HUD -->
+  <div id="hud">
+    <!-- Top Navigation & Key Inventory -->
+    <div class="top-bar">
+      <div class="compass-container">
+        <div class="compass-tape" id="compass-tape">
+          <span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span>
+        </div>
+        <div class="compass-center-marker"></div>
+      </div>
+
+      <div class="key-indicator-panel">
+        <!-- Ruby Key -->
+        <div class="key-slot" id="slot-ruby">
+          <div class="key-icon">
+            <svg viewBox="0 0 24 24"><path d="M7 14A2 2 0 0 1 5 12A2 2 0 0 1 7 10A2 2 0 0 1 9 12A2 2 0 0 1 7 14M12.6 12C12.8 11.4 13 10.7 13 10A6 6 0 0 0 7 4A6 6 0 0 0 1 10A6 6 0 0 0 7 16C7.7 16 8.4 15.8 9 15.6L18 24.6L22.6 20L21.2 18.6L18.4 21.4L15.6 18.6L18.4 15.8L17 14.4L14.2 17.2L12.6 12Z"/></svg>
+          </div>
+          <span>RUBY</span>
+        </div>
+
+        <!-- Sapphire Key -->
+        <div class="key-slot" id="slot-sapphire">
+          <div class="key-icon">
+            <svg viewBox="0 0 24 24"><path d="M7 14A2 2 0 0 1 5 12A2 2 0 0 1 7 10A2 2 0 0 1 9 12A2 2 0 0 1 7 14M12.6 12C12.8 11.4 13 10.7 13 10A6 6 0 0 0 7 4A6 6 0 0 0 1 10A6 6 0 0 0 7 16C7.7 16 8.4 15.8 9 15.6L18 24.6L22.6 20L21.2 18.6L18.4 21.4L15.6 18.6L18.4 15.8L17 14.4L14.2 17.2L12.6 12Z"/></svg>
+          </div>
+          <span>SAPPHIRE</span>
+        </div>
+
+        <!-- Topaz Key -->
+        <div class="key-slot" id="slot-topaz">
+          <div class="key-icon">
+            <svg viewBox="0 0 24 24"><path d="M7 14A2 2 0 0 1 5 12A2 2 0 0 1 7 10A2 2 0 0 1 9 12A2 2 0 0 1 7 14M12.6 12C12.8 11.4 13 10.7 13 10A6 6 0 0 0 7 4A6 6 0 0 0 1 10A6 6 0 0 0 7 16C7.7 16 8.4 15.8 9 15.6L18 24.6L22.6 20L21.2 18.6L18.4 21.4L15.6 18.6L18.4 15.8L17 14.4L14.2 17.2L12.6 12Z"/></svg>
+          </div>
+          <span>TOPAZ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification toast -->
+    <div id="notification-box">Find 3 ancient keys to unlock the iron exit gate...</div>
+
+    <!-- Bottom Left: Stamina & Flashlight Bars -->
+    <div class="bottom-bar">
+      <div class="bar-row">
+        <span class="bar-label">STAMINA</span>
+        <div class="bar-outer">
+          <div class="bar-fill" id="stamina-fill"></div>
+        </div>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">FLASHLIGHT</span>
+        <div class="bar-outer">
+          <div class="bar-fill" id="battery-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Right: Threat Heartbeat -->
+    <div class="threat-indicator">
+      <svg id="heart-icon" viewBox="0 0 24 24">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+      <span id="threat-text">CLEAR</span>
+    </div>
+
+    <!-- Bottom Center Hint -->
+    <div class="controls-hint">
+      <span><span class="key-badge">WASD</span> Move</span>
+      <span><span class="key-badge">SHIFT</span> Sprint</span>
+      <span><span class="key-badge">F</span> Flashlight (Stun Monster)</span>
+      <span><span class="key-badge">M</span> Echolocation Scan</span>
+    </div>
+  </div>
+
+  <!-- Jumpscare Shock Container -->
+  <div id="jumpscare-overlay">
+    <canvas id="jumpscare-canvas"></canvas>
+    <div id="jumpscare-blood"></div>
+  </div>
+
+  <!-- Title / Start Modal -->
+  <div class="modal-screen" id="title-screen">
+    <h1 class="game-title">LABYRINTH</h1>
+    <div class="game-subtitle">OF THE DREAD WALKER</div>
+
+    <div class="story-card">
+      You are trapped in a sprawling subterranean labyrinth.
+      An eldritch stalker wanders these damp stone halls, hunting in the dark.<br><br>
+      <strong>OBJECTIVE:</strong> Search the deep chambers to locate all <strong>3 Ancient Keys</strong>,
+      then find the fortified <strong>South Exit Gate</strong> to escape alive.
+      <div class="key-objective-preview">
+        <div class="key-preview-item" style="color:#f87171;">◆ Ruby Key</div>
+        <div class="key-preview-item" style="color:#60a5fa;">◆ Sapphire Key</div>
+        <div class="key-preview-item" style="color:#fbbf24;">◆ Topaz Key</div>
+      </div>
+    </div>
+
+    <div class="difficulty-select">
+      <button class="diff-btn" data-diff="easy">NOVICE</button>
+      <button class="diff-btn active" data-diff="normal">STANDARD</button>
+      <button class="diff-btn" data-diff="hard">NIGHTMARE</button>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn-primary" id="start-btn">ENTER THE LABYRINTH</button>
+      <div class="audio-notice">
+        <svg style="width:16px;height:16px;fill:#ef4444;" viewBox="0 0 24 24"><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02M3 9v6h4l5 5V4L7 9H3Z"/></svg>
+        <span>WEAR HEADPHONES FOR SPATIAL AUDIO TERROR</span>
+      </div>
+    </div>
+
+    <div class="controls-grid">
+      <div><span class="key-badge">W A S D</span> Walk</div>
+      <div><span class="key-badge">SHIFT</span> Sprint (Consumes Stamina)</div>
+      <div><span class="key-badge">F / CLICK</span> Toggle Flashlight</div>
+      <div><span class="key-badge">M / TAB</span> Echolocation Pulse</div>
+      <div><span class="key-badge">MOUSE</span> Look around</div>
+      <div><span class="key-badge">ESC</span> Pause Game</div>
+    </div>
+  </div>
+
+  <!-- Game Over Modal -->
+  <div class="modal-screen" id="gameover-screen" style="display: none;">
+    <h1 class="game-title" style="color: #ef4444; text-shadow: 0 0 40px #ef4444;">YOU DIED</h1>
+    <div class="game-subtitle" id="death-reason">THE DREAD WALKER CONSUMED YOUR SOUL</div>
+
+    <div class="result-stats">
+      <div class="stat-box">
+        <div class="stat-number" id="stats-time-dead">00:00</div>
+        <div class="stat-label">TIME SURVIVED</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" id="stats-keys-dead">0 / 3</div>
+        <div class="stat-label">KEYS FOUND</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="retry-btn">TRY AGAIN</button>
+  </div>
+
+  <!-- Victory Modal -->
+  <div class="modal-screen" id="victory-screen" style="display: none;">
+    <h1 class="game-title" style="color: #34d399; text-shadow: 0 0 40px #10b981;">YOU ESCAPED</h1>
+    <div class="game-subtitle">YOU UNLOCKED THE GATE AND SURVIVED THE LABYRINTH</div>
+
+    <div class="result-stats">
+      <div class="stat-box">
+        <div class="stat-number" id="stats-time-win" style="color: #34d399;">02:45</div>
+        <div class="stat-label">ESCAPE TIME</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" style="color: #34d399;">3 / 3</div>
+        <div class="stat-label">KEYS ACQUIRED</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-number" id="stats-rating" style="color: #fbbf24;">S RANK</div>
+        <div class="stat-label">SURVIVAL RATING</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="playagain-btn" style="background: linear-gradient(135deg, #059669, #047857); border-color:#10b981; box-shadow:0 0 25px rgba(16, 185, 129, 0.5);">PLAY AGAIN</button>
+  </div>
+
+  <!-- Pause Modal -->
+  <div class="modal-screen" id="pause-screen" style="display: none; background: rgba(5, 5, 10, 0.88);">
+    <h1 class="game-title" style="font-size: 42px;">PAUSED</h1>
+    <div class="game-subtitle">THE MAZE AWAITS</div>
+
+    <div class="btn-group" style="margin-bottom: 24px;">
+      <button class="btn-primary" id="resume-btn">RESUME GAME</button>
+      <button class="btn-primary" id="quit-btn" style="background: #1e293b; border-color: #475569; box-shadow: none; font-size: 16px; padding: 12px 32px;">RETURN TO MENU</button>
+    </div>
+
+    <div class="controls-grid" style="margin-top: 10px;">
+      <div><span class="key-badge">W A S D</span> Walk</div>
+      <div><span class="key-badge">SHIFT</span> Sprint</div>
+      <div><span class="key-badge">F</span> Flashlight</div>
+      <div><span class="key-badge">M</span> Echolocation Pulse</div>
+    </div>
+  </div>
+
+</body>
+</html>
