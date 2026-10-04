@@ -381,7 +381,7 @@ export class Maze {
   addTorches() {
     const s = this.size;
     // Place atmospheric sconces at crossroads
-    const torchSpacing = (s > 25) ? 6 : 5;
+    const torchSpacing = 5;
     for (let z = 3; z < s - 3; z += torchSpacing) {
       for (let x = 3; x < s - 3; x += torchSpacing) {
         if (this.grid[z][x] === 0) {
@@ -512,24 +512,17 @@ export class Maze {
       return [];
     }
 
-    const encode = (x, z) => (z << 12) | x;
-    const decodeX = (k) => k & 0xfff;
-    const decodeZ = (k) => k >> 12;
-
-    const startKey = encode(startG.x, startG.z);
-    const endKey = encode(endG.x, endG.z);
-
-    const openSet = [{ x: startG.x, z: startG.z, key: startKey, g: 0, f: Math.hypot(startG.x - endG.x, startG.z - endG.z) }];
+    const key = (x, z) => `${x},${z}`;
+    const openSet = [{ x: startG.x, z: startG.z, g: 0, f: Math.hypot(startG.x - endG.x, startG.z - endG.z) }];
     const cameFrom = new Map();
     const gScore = new Map();
-    gScore.set(startKey, 0);
+    gScore.set(key(startG.x, startG.z), 0);
 
     const dirs = [
       [0, -1], [0, 1], [-1, 0], [1, 0]
     ];
 
-    let iters = 0;
-    while (openSet.length > 0 && iters++ < 2500) {
+    while (openSet.length > 0) {
       // Find node with lowest f score
       let lowestIdx = 0;
       for (let i = 1; i < openSet.length; i++) {
@@ -540,12 +533,13 @@ export class Maze {
 
       const current = openSet.splice(lowestIdx, 1)[0];
 
-      if (current.key === endKey) {
+      if (current.x === endG.x && current.z === endG.z) {
         // Reconstruct path
         const path = [];
-        let currKey = current.key;
+        let currKey = key(current.x, current.z);
         while (cameFrom.has(currKey)) {
-          path.unshift(this.gridToWorld(decodeX(currKey), decodeZ(currKey)));
+          const [gx, gz] = currKey.split(',').map(Number);
+          path.unshift(this.gridToWorld(gx, gz));
           currKey = cameFrom.get(currKey);
         }
         return path;
@@ -556,14 +550,14 @@ export class Maze {
         const nz = current.z + dz;
 
         if (this.isWalkable(nx, nz)) {
-          const nKey = encode(nx, nz);
+          const nKey = key(nx, nz);
           const tentativeG = current.g + 1;
 
           if (!gScore.has(nKey) || tentativeG < gScore.get(nKey)) {
-            cameFrom.set(nKey, current.key);
+            cameFrom.set(nKey, key(current.x, current.z));
             gScore.set(nKey, tentativeG);
             const h = Math.hypot(nx - endG.x, nz - endG.z);
-            openSet.push({ x: nx, z: nz, key: nKey, g: tentativeG, f: tentativeG + h });
+            openSet.push({ x: nx, z: nz, g: tentativeG, f: tentativeG + h });
           }
         }
       }

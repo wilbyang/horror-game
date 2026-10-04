@@ -53,7 +53,7 @@ class Game {
     this.scene.background = new THREE.Color(0x0a0c16);
     this.scene.fog = new THREE.FogExp2(0x0c0f1a, 0.022);
 
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 180);
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 120);
     this.scene.add(this.camera);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -218,10 +218,10 @@ class Game {
     // Determine maze size by difficulty
     let mazeDimension;
     if (this.currentWorld === 2) {
-      // World 2: Larger and more expansive subterranean labyrinth (31x31 normal, 27x27 easy, 35x35 hard)
-      mazeDimension = 31;
-      if (this.ui.selectedDifficulty === 'easy') mazeDimension = 27;
-      if (this.ui.selectedDifficulty === 'hard') mazeDimension = 35;
+      // World 2: Larger and more winding
+      mazeDimension = 25;
+      if (this.ui.selectedDifficulty === 'easy') mazeDimension = 21;
+      if (this.ui.selectedDifficulty === 'hard') mazeDimension = 29;
     } else {
       // World 1
       mazeDimension = 21;
@@ -312,7 +312,7 @@ class Game {
     let bestDist = 0;
     let bestPos = new THREE.Vector3();
 
-    for (let attempts = 0; attempts < 90; attempts++) {
+    for (let attempts = 0; attempts < 60; attempts++) {
       const gx = 1 + Math.floor(Math.random() * (this.maze.size - 2));
       const gz = 1 + Math.floor(Math.random() * (this.maze.size - 2));
 
