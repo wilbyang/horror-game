@@ -11,10 +11,11 @@ export const MONSTER_STATE = {
 };
 
 export class Monster {
-  constructor(scene, maze, soundEngine) {
+  constructor(scene, maze, soundEngine, isWorld2 = false) {
     this.scene = scene;
     this.maze = maze;
     this.sound = soundEngine;
+    this.isWorld2 = isWorld2;
 
     this.group = new THREE.Group();
     this.group.position.set(0, 0, 0);
@@ -25,10 +26,10 @@ export class Monster {
     this.currentPath = [];
     this.pathIndex = 0;
 
-    // Movement speeds (slower than player walkSpeed of 4.4)
-    this.patrolSpeed = 1.9;
-    this.chaseSpeed = 3.6;
-    this.investigateSpeed = 2.6;
+    // Movement speeds (World 2 monster is faster than player's 4.4 walkSpeed!)
+    this.patrolSpeed = this.isWorld2 ? 2.5 : 1.9;
+    this.chaseSpeed = this.isWorld2 ? 4.75 : 3.6;
+    this.investigateSpeed = this.isWorld2 ? 3.3 : 2.6;
 
     // Detection timers
     this.repathTimer = 0;
@@ -66,41 +67,46 @@ export class Monster {
 
   buildRealisticMonster() {
     // Realistic PBR Necrotic Flesh Material
-    const skinTex = TextureGenerator.createMonsterSkinTexture();
+    const skinTex = this.isWorld2 ? TextureGenerator.createAbyssalMonsterSkinTexture() : TextureGenerator.createMonsterSkinTexture();
     const roughTex = TextureGenerator.createMonsterRoughnessTexture();
-    const boneTex = TextureGenerator.createMonsterBoneTexture();
+    const boneTex = this.isWorld2 ? TextureGenerator.createAbyssalMonsterBoneTexture() : TextureGenerator.createMonsterBoneTexture();
 
     const fleshMat = new THREE.MeshStandardMaterial({
       map: skinTex,
       roughnessMap: roughTex,
       roughness: 0.65,
-      metalness: 0.18,
+      metalness: this.isWorld2 ? 0.3 : 0.18,
       bumpMap: skinTex,
-      bumpScale: 0.05
+      bumpScale: 0.05,
+      emissive: this.isWorld2 ? 0x220512 : 0x000000,
+      emissiveIntensity: this.isWorld2 ? 0.65 : 0
     });
 
     const boneMat = new THREE.MeshStandardMaterial({
       map: boneTex,
-      roughness: 0.7,
-      metalness: 0.1,
+      color: this.isWorld2 ? 0x221122 : 0xffffff,
+      roughness: 0.65,
+      metalness: this.isWorld2 ? 0.35 : 0.1,
       bumpMap: boneTex,
       bumpScale: 0.04
     });
 
     const fangMat = new THREE.MeshStandardMaterial({
-      color: 0xe8e0cf,
-      roughness: 0.3,
-      metalness: 0.1
+      color: this.isWorld2 ? 0xffffff : 0xe8e0cf,
+      emissive: this.isWorld2 ? 0x440015 : 0x000000,
+      emissiveIntensity: this.isWorld2 ? 0.6 : 0,
+      roughness: 0.25,
+      metalness: 0.15
     });
 
     const mouthInsideMat = new THREE.MeshStandardMaterial({
-      color: 0x1f060a,
+      color: this.isWorld2 ? 0x120208 : 0x1f060a,
       roughness: 0.2,
       metalness: 0.1
     });
 
     const eyeMat = new THREE.MeshBasicMaterial({
-      color: 0xff0022
+      color: this.isWorld2 ? 0xff0044 : 0xff0022
     });
 
     // Root Torso
@@ -122,8 +128,9 @@ export class Monster {
       vert.rotation.x = Math.PI / 2;
       this.torso.add(vert);
 
-      // Jagged protruding spinal bone spurs
-      const spikeGeo = new THREE.ConeGeometry(0.035, 0.22 + (v % 3) * 0.08, 4);
+      // Jagged protruding spinal bone spurs (longer scythe blades in World 2)
+      const spikeLen = this.isWorld2 ? (0.34 + (v % 3) * 0.12) : (0.22 + (v % 3) * 0.08);
+      const spikeGeo = new THREE.ConeGeometry(0.04, spikeLen, 4);
       const spike = new THREE.Mesh(spikeGeo, boneMat);
       spike.position.set(0, 0.45 - v * 0.12, -0.32 - Math.sin(v * 0.4) * 0.08);
       spike.rotation.x = -Math.PI / 2.6;
@@ -205,6 +212,31 @@ export class Monster {
     const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMat);
     eyeR.position.set(0.13, 0.06, 0.31);
     this.head.add(eyeR);
+
+    // World 2: Demonic Horns & Secondary Quad Glowing Eyes
+    if (this.isWorld2) {
+      for (const side of [-1, 1]) {
+        const hornCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(side * 0.16, 0.22, 0.08),
+          new THREE.Vector3(side * 0.34, 0.44, 0.02),
+          new THREE.Vector3(side * 0.48, 0.62, -0.16),
+          new THREE.Vector3(side * 0.38, 0.76, -0.28)
+        ]);
+        const hornGeo = new THREE.TubeGeometry(hornCurve, 14, 0.05, 8, false);
+        const horn = new THREE.Mesh(hornGeo, boneMat);
+        this.head.add(horn);
+      }
+
+      // Secondary Upper Eyes (Quad blazing gaze)
+      const eyeMatQuad = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+      const eyeUpperL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMatQuad);
+      eyeUpperL.position.set(-0.16, 0.16, 0.28);
+      this.head.add(eyeUpperL);
+
+      const eyeUpperR = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMatQuad);
+      eyeUpperR.position.set(0.16, 0.16, 0.28);
+      this.head.add(eyeUpperR);
+    }
 
     // Eye spotlight beams cutting through dark corridors
     this.eyeLight = new THREE.SpotLight(0xff0820, 4.5, 16, Math.PI / 4, 0.6, 1.8);
@@ -420,8 +452,8 @@ export class Monster {
   stun() {
     if (this.state === MONSTER_STATE.STUNNED || this.state === MONSTER_STATE.KILLING || this.stunCooldown > 0) return;
     this.state = MONSTER_STATE.STUNNED;
-    this.stunTimer = 2.4;
-    this.stunCooldown = 6.0;
+    this.stunTimer = this.isWorld2 ? 1.2 : 2.4;
+    this.stunCooldown = this.isWorld2 ? 12.0 : 6.0;
     if (this.sound) {
       this.sound.playMonsterStunned();
     }
@@ -468,9 +500,9 @@ export class Monster {
       return;
     }
 
-    // Line of sight & hearing
+    // Line of sight & hearing (World 2 monster has far sharper senses)
     const hasLOS = this.maze.hasLineOfSight(this.group.position, playerPos);
-    const hearingRadius = 11 * (playerNoise || 0.5);
+    const hearingRadius = (this.isWorld2 ? 18.0 : 11.0) * (playerNoise || 0.5);
     const canHear = distToPlayer < hearingRadius;
 
     // Vision cone (horizontal 2D plane)
@@ -483,10 +515,10 @@ export class Monster {
       playerPos.z - this.group.position.z
     ).normalize();
     const dot = monsterForward.dot(toPlayer);
-    const inSightCone = dot > 0.25 || distToPlayer < 7.0;
+    const inSightCone = dot > (this.isWorld2 ? 0.15 : 0.25) || distToPlayer < (this.isWorld2 ? 12.0 : 7.0);
 
     // State Transitions
-    if (hasLOS && (inSightCone || distToPlayer < 8.0)) {
+    if (hasLOS && (inSightCone || distToPlayer < (this.isWorld2 ? 13.0 : 8.0))) {
       if (this.state !== MONSTER_STATE.CHASE) {
         this.state = MONSTER_STATE.CHASE;
         if (this.sound) {
@@ -498,10 +530,11 @@ export class Monster {
       this.hearNoise(playerPos);
     }
 
-    // Repath timer during chase
+    // Repath timer during chase (World 2 navigates corners twice as fast)
     this.repathTimer += delta;
     if (this.state === MONSTER_STATE.CHASE) {
-      if (this.repathTimer > 0.35) {
+      const repathInterval = this.isWorld2 ? 0.18 : 0.35;
+      if (this.repathTimer > repathInterval) {
         this.repathTimer = 0;
         this.currentPath = this.maze.findPath(this.group.position, playerPos);
         this.pathIndex = 0;
@@ -561,7 +594,7 @@ export class Monster {
     this.animateMovement(delta, moveSpeed);
 
     // Footstep audio
-    const stepInterval = (this.state === MONSTER_STATE.CHASE) ? 0.34 : 0.62;
+    const stepInterval = (this.state === MONSTER_STATE.CHASE) ? (this.isWorld2 ? 0.25 : 0.34) : 0.62;
     this.stepTimer += delta;
     if (this.stepTimer >= stepInterval) {
       this.stepTimer = 0;

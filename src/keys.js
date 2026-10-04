@@ -118,8 +118,9 @@ export class KeyItem {
 }
 
 export class ExitGate {
-  constructor(exitPos) {
+  constructor(exitPos, worldLevel = 1) {
     this.pos = exitPos.clone();
+    this.worldLevel = worldLevel;
     this.group = new THREE.Group();
     this.group.position.copy(this.pos);
 
@@ -134,7 +135,10 @@ export class ExitGate {
 
   buildGate() {
     // Large heavy stone arch frame
-    const archMat = new THREE.MeshStandardMaterial({ color: 0x121218, roughness: 0.95 });
+    const archMat = new THREE.MeshStandardMaterial({
+      color: (this.worldLevel === 2) ? 0x14050a : 0x121218,
+      roughness: 0.95
+    });
 
     // Left pillar
     const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.8, WALL_HEIGHT, 0.8), archMat);
@@ -154,8 +158,8 @@ export class ExitGate {
     // Emergency Exit Sign
     const signGeo = new THREE.BoxGeometry(1.6, 0.4, 0.15);
     const signMat = new THREE.MeshStandardMaterial({
-      color: 0x880000,
-      emissive: 0x660000,
+      color: (this.worldLevel === 2) ? 0x990022 : 0x880000,
+      emissive: (this.worldLevel === 2) ? 0x660011 : 0x660000,
       emissiveIntensity: 0.8
     });
     const sign = new THREE.Mesh(signGeo, signMat);
@@ -163,7 +167,8 @@ export class ExitGate {
     this.group.add(sign);
 
     // Emergency red beacon light
-    this.beaconLight = new THREE.PointLight(0xff1111, 1.2, 10, 1.8);
+    const beaconCol = (this.worldLevel === 2) ? 0xff0044 : 0xff1111;
+    this.beaconLight = new THREE.PointLight(beaconCol, 1.4, 12, 1.8);
     this.beaconLight.position.set(0, WALL_HEIGHT - 0.3, 0.6);
     this.group.add(this.beaconLight);
 
@@ -183,13 +188,20 @@ export class ExitGate {
     // Altar pedestal with 3 Key Receptacles in front of the gate
     const altar = new THREE.Mesh(
       new THREE.BoxGeometry(2.4, 0.9, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0x181824, roughness: 0.8 })
+      new THREE.MeshStandardMaterial({
+        color: (this.worldLevel === 2) ? 0x180510 : 0x181824,
+        roughness: 0.8
+      })
     );
     altar.position.set(0, 0.45, 1.2);
     this.group.add(altar);
 
     // 3 Socket gems
-    const sockets = [
+    const sockets = (this.worldLevel === 2) ? [
+      { id: 'amethyst', x: -0.7, color: 0xa855f7 },
+      { id: 'emerald', x: 0, color: 0x10b981 },
+      { id: 'crimson', x: 0.7, color: 0xf43f5e }
+    ] : [
       { id: 'ruby', x: -0.7, color: 0xef4444 },
       { id: 'sapphire', x: 0, color: 0x3b82f6 },
       { id: 'topaz', x: 0.7, color: 0xf59e0b }
@@ -228,7 +240,7 @@ export class ExitGate {
     // Escape gateway tunnel / portal beyond the gate
     const portalGeo = new THREE.PlaneGeometry(CELL_SIZE - 1.0, WALL_HEIGHT - 0.8);
     const portalMat = new THREE.MeshBasicMaterial({
-      color: 0x00ff88,
+      color: (this.worldLevel === 2) ? 0xa855f7 : 0x00ff88,
       transparent: true,
       opacity: 0,
       side: THREE.DoubleSide

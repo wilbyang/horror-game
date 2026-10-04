@@ -6,15 +6,24 @@ export class UIController {
     this.dangerOverlay = document.getElementById('danger-overlay');
     this.crosshair = document.getElementById('crosshair');
     this.hud = document.getElementById('hud');
+    this.worldBadge = document.getElementById('world-badge');
 
     // Compass
     this.compassTape = document.getElementById('compass-tape');
     this.compassMarkersContainer = document.getElementById('compass-key-markers');
 
-    // Key Slots
-    this.slotRuby = document.getElementById('slot-ruby');
-    this.slotSapphire = document.getElementById('slot-sapphire');
-    this.slotTopaz = document.getElementById('slot-topaz');
+    // Key Slots (Generic for World 1 & 2)
+    this.keySlots = [
+      document.getElementById('slot-key-0'),
+      document.getElementById('slot-key-1'),
+      document.getElementById('slot-key-2')
+    ];
+    this.keyLabels = [
+      document.getElementById('slot-key-label-0'),
+      document.getElementById('slot-key-label-1'),
+      document.getElementById('slot-key-label-2')
+    ];
+    this.keyIds = ['ruby', 'sapphire', 'topaz'];
 
     // Status bars
     this.staminaFill = document.getElementById('stamina-fill');
@@ -42,6 +51,24 @@ export class UIController {
     this.victoryScreen = document.getElementById('victory-screen');
     this.pauseScreen = document.getElementById('pause-screen');
 
+    // Title screen elements
+    this.btnWorld1 = document.getElementById('btn-world-1');
+    this.btnWorld2 = document.getElementById('btn-world-2');
+    this.w2CardTitle = document.getElementById('w2-card-title');
+    this.w2CardSub = document.getElementById('w2-card-sub');
+    this.titleMainHeader = document.getElementById('title-main-header');
+    this.titleSubHeader = document.getElementById('title-sub-header');
+    this.titleStoryCard = document.getElementById('title-story-card');
+    this.startBtn = document.getElementById('start-btn');
+
+    // Victory screen elements
+    this.btnEnterWorld2 = document.getElementById('btn-enter-world2');
+    this.playagainBtn = document.getElementById('playagain-btn');
+    this.victoryMenuBtn = document.getElementById('victory-menu-btn');
+    this.victoryTitle = document.getElementById('victory-title');
+    this.victorySubtitle = document.getElementById('victory-subtitle');
+    this.deathReason = document.getElementById('death-reason');
+
     // Stats elements
     this.statsTimeDead = document.getElementById('stats-time-dead');
     this.statsKeysDead = document.getElementById('stats-keys-dead');
@@ -54,6 +81,9 @@ export class UIController {
     this.jumpscareCtx = this.jumpscareCanvas ? this.jumpscareCanvas.getContext('2d') : null;
 
     this.selectedDifficulty = 'normal';
+    this.selectedWorld = 1;
+    this.isWorld2Unlocked = false;
+
     this.setupDifficultyButtons();
   }
 
@@ -66,6 +96,116 @@ export class UIController {
         this.selectedDifficulty = btn.dataset.diff;
       });
     });
+  }
+
+  setupWorldButtons(onWorldChange) {
+    if (this.btnWorld1 && this.btnWorld2) {
+      this.btnWorld1.addEventListener('click', () => {
+        this.selectWorld(1, onWorldChange);
+      });
+
+      this.btnWorld2.addEventListener('click', () => {
+        if (this.isWorld2Unlocked) {
+          this.selectWorld(2, onWorldChange);
+        } else {
+          this.notify('Survive World 1 to unlock The Abyssal Crypt!', 3000);
+        }
+      });
+    }
+  }
+
+  updateWorldUnlockState(unlocked) {
+    this.isWorld2Unlocked = unlocked;
+    if (this.btnWorld2) {
+      if (unlocked) {
+        this.btnWorld2.classList.remove('locked');
+        if (this.w2CardTitle) this.w2CardTitle.textContent = 'WORLD 2';
+        if (this.w2CardSub) this.w2CardSub.textContent = 'THE ABYSSAL CRYPT';
+      } else {
+        this.btnWorld2.classList.add('locked');
+        if (this.w2CardTitle) this.w2CardTitle.textContent = 'WORLD 2 🔒';
+        if (this.w2CardSub) this.w2CardSub.textContent = 'THE ABYSSAL CRYPT';
+      }
+    }
+  }
+
+  selectWorld(worldLevel, callback) {
+    this.selectedWorld = worldLevel;
+    if (this.btnWorld1) {
+      if (worldLevel === 1) this.btnWorld1.classList.add('active');
+      else this.btnWorld1.classList.remove('active');
+    }
+    if (this.btnWorld2) {
+      if (worldLevel === 2) this.btnWorld2.classList.add('active');
+      else this.btnWorld2.classList.remove('active');
+    }
+
+    if (worldLevel === 2) {
+      if (this.titleMainHeader) this.titleMainHeader.textContent = 'THE ABYSSAL CRYPT';
+      if (this.titleSubHeader) this.titleSubHeader.textContent = 'LAIR OF THE ABYSSAL STALKER';
+      if (this.titleStoryCard) {
+        this.titleStoryCard.innerHTML = `
+          You have breached the iron gate and descended into the abyssal underworld.<br>
+          Obsidian fissures glow with molten lava, and blood-mist fills the chambers.<br><br>
+          <strong>OBJECTIVE:</strong> Recover <strong>3 Abyssal Relics</strong> and find the <strong>Void Portal</strong>.<br>
+          <strong style="color:#f43f5e;">THREAT:</strong> The Abyssal Stalker is <em>FASTER THAN YOUR NORMAL WALK SPEED</em> and highly resistant to light stuns!
+          <div class="key-objective-preview" id="key-preview-container">
+            <div class="key-preview-item" style="color:#c084fc;">◆ Void Amethyst</div>
+            <div class="key-preview-item" style="color:#34d399;">◆ Soul Emerald</div>
+            <div class="key-preview-item" style="color:#fb7185;">◆ Abyssal Eye</div>
+          </div>
+        `;
+      }
+      if (this.startBtn) this.startBtn.textContent = 'ENTER THE ABYSS';
+    } else {
+      if (this.titleMainHeader) this.titleMainHeader.textContent = 'LABYRINTH';
+      if (this.titleSubHeader) this.titleSubHeader.textContent = 'OF THE DREAD WALKER';
+      if (this.titleStoryCard) {
+        this.titleStoryCard.innerHTML = `
+          You are trapped in a sprawling subterranean labyrinth.
+          An eldritch stalker wanders these damp stone halls, hunting in the dark.<br><br>
+          <strong>OBJECTIVE:</strong> Search the deep chambers to locate all <strong>3 Ancient Keys</strong>,
+          then find the fortified <strong>South Exit Gate</strong> to escape alive.
+          <div class="key-objective-preview" id="key-preview-container">
+            <div class="key-preview-item" style="color:#f87171;">◆ Ruby Key</div>
+            <div class="key-preview-item" style="color:#60a5fa;">◆ Sapphire Key</div>
+            <div class="key-preview-item" style="color:#fbbf24;">◆ Topaz Key</div>
+          </div>
+        `;
+      }
+      if (this.startBtn) this.startBtn.textContent = 'ENTER THE LABYRINTH';
+    }
+
+    if (callback) callback(worldLevel);
+  }
+
+  setWorld(worldLevel) {
+    this.currentWorld = worldLevel;
+
+    // Reset key slot states
+    this.keySlots.forEach(slot => {
+      if (slot) slot.className = 'key-slot';
+    });
+
+    if (worldLevel === 2) {
+      if (this.worldBadge) {
+        this.worldBadge.textContent = 'WORLD 2: THE ABYSS';
+        this.worldBadge.className = 'world-badge w2';
+      }
+      if (this.keyLabels[0]) this.keyLabels[0].textContent = 'AMETHYST';
+      if (this.keyLabels[1]) this.keyLabels[1].textContent = 'EMERALD';
+      if (this.keyLabels[2]) this.keyLabels[2].textContent = 'CRIMSON';
+      this.keyIds = ['amethyst', 'emerald', 'crimson'];
+    } else {
+      if (this.worldBadge) {
+        this.worldBadge.textContent = 'WORLD 1: LABYRINTH';
+        this.worldBadge.className = 'world-badge';
+      }
+      if (this.keyLabels[0]) this.keyLabels[0].textContent = 'RUBY';
+      if (this.keyLabels[1]) this.keyLabels[1].textContent = 'SAPPHIRE';
+      if (this.keyLabels[2]) this.keyLabels[2].textContent = 'TOPAZ';
+      this.keyIds = ['ruby', 'sapphire', 'topaz'];
+    }
   }
 
   showHUD() {
@@ -92,14 +232,21 @@ export class UIController {
     this.pauseScreen.style.display = 'none';
   }
 
-  showGameOver(timeSurvived, keysFound) {
+  showGameOver(timeSurvived, keysFound, worldLevel = 1) {
     this.hideHUD();
     this.statsTimeDead.textContent = this.formatTime(timeSurvived);
     this.statsKeysDead.textContent = `${keysFound} / 3`;
+    if (this.deathReason) {
+      if (worldLevel === 2) {
+        this.deathReason.textContent = 'THE ABYSSAL STALKER SHREDDED YOUR SOUL';
+      } else {
+        this.deathReason.textContent = 'THE DREAD WALKER CONSUMED YOUR SOUL';
+      }
+    }
     this.gameoverScreen.style.display = 'flex';
   }
 
-  showVictory(timeElapsed) {
+  showVictory(timeElapsed, worldLevel = 1) {
     this.hideHUD();
     this.statsTimeWin.textContent = this.formatTime(timeElapsed);
 
@@ -107,6 +254,38 @@ export class UIController {
     if (timeElapsed > 240) rating = 'B RANK';
     else if (timeElapsed > 150) rating = 'A RANK';
     this.statsRating.textContent = rating;
+
+    if (worldLevel === 1) {
+      if (this.victoryTitle) {
+        this.victoryTitle.textContent = 'YOU ESCAPED';
+        this.victoryTitle.style.color = '#34d399';
+        this.victoryTitle.style.textShadow = '0 0 40px #10b981';
+      }
+      if (this.victorySubtitle) {
+        this.victorySubtitle.innerHTML = 'YOU UNLOCKED THE GATE AND SURVIVED THE LABYRINTH!<br><span style="color:#c084fc;font-weight:bold;letter-spacing:2px;display:inline-block;margin-top:6px;">WORLD 2: THE ABYSSAL CRYPT IS NOW UNLOCKED!</span>';
+      }
+      if (this.btnEnterWorld2) {
+        this.btnEnterWorld2.style.display = 'block';
+      }
+      if (this.playagainBtn) {
+        this.playagainBtn.textContent = 'REPLAY WORLD 1';
+      }
+    } else {
+      if (this.victoryTitle) {
+        this.victoryTitle.textContent = 'ABYSS CONQUERED';
+        this.victoryTitle.style.color = '#a855f7';
+        this.victoryTitle.style.textShadow = '0 0 45px #a855f7';
+      }
+      if (this.victorySubtitle) {
+        this.victorySubtitle.innerHTML = 'YOU DEFEATED THE ABYSSAL STALKER AND ESCAPED THE VOID!<br><span style="color:#34d399;font-weight:bold;letter-spacing:2px;display:inline-block;margin-top:6px;">MASTER SURVIVOR: COMPLETED BOTH WORLDS</span>';
+      }
+      if (this.btnEnterWorld2) {
+        this.btnEnterWorld2.style.display = 'none';
+      }
+      if (this.playagainBtn) {
+        this.playagainBtn.textContent = 'REPLAY WORLD 2';
+      }
+    }
 
     this.victoryScreen.style.display = 'flex';
   }
@@ -159,7 +338,7 @@ export class UIController {
         }
       });
 
-      // If all keys collected, point to Exit Gate
+      // If all keys collected, point to Exit Gate / Void Portal
       const allCollected = keys.length > 0 && keys.every(k => k.collected);
       if (allCollected && exitGate) {
         const dx = exitGate.pos.x - playerPos.x;
@@ -171,7 +350,9 @@ export class UIController {
 
         const pxOffset = diff * (180 / Math.PI) * pxPerDegree;
         if (Math.abs(pxOffset) < 125) {
-          markersHtml += `<div class="compass-key-marker" style="left: calc(50% + ${pxOffset}px); color: #10b981; border-color: #10b981;">★ EXIT</div>`;
+          const exitColor = (exitGate.worldLevel === 2) ? '#a855f7' : '#10b981';
+          const exitLabel = (exitGate.worldLevel === 2) ? '★ VOID PORTAL' : '★ EXIT';
+          markersHtml += `<div class="compass-key-marker" style="left: calc(50% + ${pxOffset}px); color: ${exitColor}; border-color: ${exitColor};">${exitLabel}</div>`;
         }
       }
 
@@ -191,14 +372,17 @@ export class UIController {
   }
 
   updateKeys(keys) {
-    if (keys.ruby) this.slotRuby.classList.add('collected', 'ruby');
-    else this.slotRuby.classList.remove('collected', 'ruby');
-
-    if (keys.sapphire) this.slotSapphire.classList.add('collected', 'sapphire');
-    else this.slotSapphire.classList.remove('collected', 'sapphire');
-
-    if (keys.topaz) this.slotTopaz.classList.add('collected', 'topaz');
-    else this.slotTopaz.classList.remove('collected', 'topaz');
+    if (!this.keyIds) return;
+    this.keyIds.forEach((id, idx) => {
+      const slot = this.keySlots[idx];
+      if (slot) {
+        if (keys[id]) {
+          slot.className = `key-slot collected ${id}`;
+        } else {
+          slot.className = 'key-slot';
+        }
+      }
+    });
   }
 
   updateThreat(distance, isChasing) {

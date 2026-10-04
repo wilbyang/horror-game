@@ -80,6 +80,181 @@ export class TextureGenerator {
     return texture;
   }
 
+  static createAbyssalWallTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Pitch-black scorched basalt
+    ctx.fillStyle = '#12070a';
+    ctx.fillRect(0, 0, 512, 512);
+
+    const rows = 16;
+    const cols = 8;
+    const rowHeight = 512 / rows;
+    const colWidth = 512 / cols;
+
+    for (let r = 0; r < rows; r++) {
+      const offsetX = (r % 2 === 0) ? 0 : colWidth / 2;
+      for (let c = -1; c <= cols; c++) {
+        const x = c * colWidth + offsetX;
+        const y = r * rowHeight;
+
+        // Dark charred brick with crimson undertones
+        const shade = 18 + Math.floor(Math.random() * 16);
+        ctx.fillStyle = `rgb(${shade + 8}, ${shade}, ${shade + 2})`;
+        ctx.fillRect(x + 2, y + 2, colWidth - 4, rowHeight - 4);
+
+        // Glowing magma/crimson fissure cracks in bricks
+        if (Math.random() < 0.28) {
+          ctx.strokeStyle = Math.random() > 0.4 ? 'rgba(230, 20, 40, 0.75)' : 'rgba(160, 10, 80, 0.75)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(x + 4, y + rowHeight / 2);
+          ctx.lineTo(x + colWidth * 0.5, y + 4 + Math.random() * 10);
+          ctx.lineTo(x + colWidth - 4, y + rowHeight - 4);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Glowing red mortar lines
+    ctx.strokeStyle = 'rgba(120, 10, 20, 0.6)';
+    ctx.lineWidth = 3;
+    for (let r = 0; r <= rows; r++) {
+      ctx.beginPath();
+      ctx.moveTo(0, r * rowHeight);
+      ctx.lineTo(512, r * rowHeight);
+      ctx.stroke();
+    }
+    for (let r = 0; r < rows; r++) {
+      const offsetX = (r % 2 === 0) ? 0 : colWidth / 2;
+      for (let c = -1; c <= cols; c++) {
+        const x = c * colWidth + offsetX;
+        ctx.beginPath();
+        ctx.moveTo(x, r * rowHeight);
+        ctx.lineTo(x, (r + 1) * rowHeight);
+        ctx.stroke();
+      }
+    }
+
+    // Seeping dark blood drips
+    ctx.fillStyle = 'rgba(70, 0, 10, 0.6)';
+    for (let d = 0; d < 10; d++) {
+      const dx = Math.random() * 512;
+      const dlen = 50 + Math.random() * 160;
+      ctx.fillRect(dx, 0, 3 + Math.random() * 3, dlen);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }
+
+  static createAbyssalFloorTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Volcanic dark ground
+    ctx.fillStyle = '#0f0508';
+    ctx.fillRect(0, 0, 512, 512);
+
+    const gridSize = 64;
+    for (let x = 0; x < 512; x += gridSize) {
+      for (let y = 0; y < 512; y += gridSize) {
+        const v = 22 + Math.floor(Math.random() * 14);
+        ctx.fillStyle = `rgb(${v + 6}, ${v}, ${v + 3})`;
+        ctx.fillRect(x + 2, y + 2, gridSize - 4, gridSize - 4);
+
+        // Glowing subterranean fissures
+        if (Math.random() > 0.3) {
+          ctx.strokeStyle = Math.random() > 0.5 ? 'rgba(240, 30, 40, 0.8)' : 'rgba(180, 20, 90, 0.7)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x + 6, y + 6);
+          ctx.lineTo(x + gridSize * 0.45, y + gridSize * 0.55);
+          ctx.lineTo(x + gridSize - 6, y + gridSize * 0.75);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Molten stone joints
+    ctx.strokeStyle = 'rgba(90, 8, 16, 0.7)';
+    ctx.lineWidth = 4;
+    for (let i = 0; i <= 512; i += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 512);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(512, i);
+      ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }
+
+  static createAbyssalMonsterSkinTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Deep pitch-black charred flesh
+    ctx.fillStyle = '#0c0710';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Glowing bioluminescent violet & crimson veins
+    for (let v = 0; v < 36; v++) {
+      ctx.strokeStyle = Math.random() > 0.4 ? 'rgba(180, 20, 220, 0.8)' : 'rgba(240, 20, 60, 0.85)';
+      ctx.lineWidth = 1.5 + Math.random() * 2;
+      ctx.beginPath();
+      let vx = Math.random() * 512;
+      let vy = Math.random() * 512;
+      ctx.moveTo(vx, vy);
+      for (let s = 0; s < 5; s++) {
+        vx += (Math.random() - 0.5) * 60;
+        vy += (Math.random() - 0.5) * 60;
+        ctx.lineTo(vx, vy);
+      }
+      ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+  }
+
+  static createAbyssalMonsterBoneTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Obsidian crystallized bone
+    ctx.fillStyle = '#160814';
+    ctx.fillRect(0, 0, 256, 256);
+
+    for (let i = 0; i < 200; i++) {
+      const x = Math.random() * 256;
+      const y = Math.random() * 256;
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(80, 20, 70, 0.6)' : 'rgba(30, 10, 25, 0.7)';
+      ctx.fillRect(x, y, 3, 3);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+  }
+
   static createFloorTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512;

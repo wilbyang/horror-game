@@ -264,6 +264,127 @@
       fill: #f59e0b;
     }
 
+    /* World 2 Key Slots */
+    .key-slot.collected.amethyst {
+      color: #c084fc;
+      text-shadow: 0 0 8px rgba(168, 85, 247, 0.7);
+    }
+    .key-slot.collected.amethyst .key-icon {
+      border-color: #a855f7;
+      background: rgba(168, 85, 247, 0.3);
+      box-shadow: 0 0 14px rgba(168, 85, 247, 0.7);
+      transform: scale(1.1);
+    }
+    .key-slot.collected.amethyst svg {
+      fill: #a855f7;
+    }
+
+    .key-slot.collected.emerald {
+      color: #34d399;
+      text-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+    }
+    .key-slot.collected.emerald .key-icon {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.3);
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.7);
+      transform: scale(1.1);
+    }
+    .key-slot.collected.emerald svg {
+      fill: #10b981;
+    }
+
+    .key-slot.collected.crimson {
+      color: #fb7185;
+      text-shadow: 0 0 8px rgba(244, 63, 94, 0.7);
+    }
+    .key-slot.collected.crimson .key-icon {
+      border-color: #f43f5e;
+      background: rgba(244, 63, 94, 0.3);
+      box-shadow: 0 0 14px rgba(244, 63, 94, 0.7);
+      transform: scale(1.1);
+    }
+    .key-slot.collected.crimson svg {
+      fill: #f43f5e;
+    }
+
+    /* Top Bar World Badge */
+    .world-badge {
+      font-size: 11px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      color: #94a3b8;
+      background: rgba(10, 14, 26, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 3px 12px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+    }
+    .world-badge.w2 {
+      color: #f43f5e;
+      border-color: #f43f5e;
+      box-shadow: 0 0 14px rgba(244, 63, 94, 0.45);
+      background: rgba(30, 8, 14, 0.9);
+    }
+
+    /* World Selector in Title */
+    .world-select-group {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .world-card-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 22px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      cursor: pointer;
+      color: #94a3b8;
+      transition: all 0.25s ease;
+      min-width: 180px;
+    }
+    .world-card-btn:hover:not(.locked) {
+      border-color: #94a3b8;
+      transform: translateY(-2px);
+    }
+    .world-card-btn.active {
+      border-color: #ef4444;
+      background: rgba(220, 38, 38, 0.18);
+      color: #ffffff;
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+    }
+    .world-card-btn.w2.active {
+      border-color: #a855f7;
+      background: rgba(168, 85, 247, 0.22);
+      color: #f3e8ff;
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.55);
+    }
+    .world-card-btn.locked {
+      opacity: 0.5;
+      cursor: not-allowed;
+      border-style: dashed;
+      background: rgba(15, 23, 42, 0.35);
+    }
+    .world-card-title {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      font-family: 'Cinzel', serif;
+    }
+    .world-card-sub {
+      font-size: 11px;
+      letter-spacing: 1px;
+      margin-top: 4px;
+      color: #64748b;
+    }
+    .world-card-btn.active .world-card-sub {
+      color: #e2e8f0;
+    }
+
     /* Bottom Status Bars */
     .bottom-bar {
       position: absolute;
@@ -652,6 +773,7 @@
   <div id="hud">
     <!-- Top Navigation & Key Inventory -->
     <div class="top-bar">
+      <div class="world-badge" id="world-badge">WORLD 1: LABYRINTH</div>
       <div class="compass-container">
         <div class="compass-tape" id="compass-tape">
           <span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span><span>SW</span><span>W</span><span>NW</span><span>N</span><span>NE</span><span>E</span><span>SE</span><span>S</span>
@@ -661,28 +783,28 @@
       </div>
 
       <div class="key-indicator-panel">
-        <!-- Ruby Key -->
-        <div class="key-slot" id="slot-ruby">
+        <!-- Key Slot 0 -->
+        <div class="key-slot" id="slot-key-0">
           <div class="key-icon">
             <svg viewBox="0 0 24 24"><path d="M7 14A2 2 0 0 1 5 12A2 2 0 0 1 7 10A2 2 0 0 1 9 12A2 2 0 0 1 7 14M12.6 12C12.8 11.4 13 10.7 13 10A6 6 0 0 0 7 4A6 6 0 0 0 1 10A6 6 0 0 0 7 16C7.7 16 8.4 15.8 9 15.6L18 24.6L22.6 20L21.2 18.6L18.4 21.4L15.6 18.6L18.4 15.8L17 14.4L14.2 17.2L12.6 12Z"/></svg>
           </div>
-          <span>RUBY</span>
+          <span id="slot-key-label-0">RUBY</span>
         </div>
 
-        <!-- Sapphire Key -->
-        <div class="key-slot" id="slot-sapphire">
+        <!-- Key Slot 1 -->
+        <div class="key-slot" id="slot-key-1">
           <div class="key-icon">
             <svg viewBox="0 0 24 24"><path d="M7 14A2 2 0 0 1 5 12A2 2 0 0 1 7 10A2 2 0 0 1 9 12A2 2 0 0 1 7 14M12.6 12C12.8 11.4 13 10.7 13 10A6 6 0 0 0 7 4A6 6 0 0 0 1 10A6 6 0 0 0 7 16C7.7 16 8.4 15.8 9 15.6L18 24.6L22.6 20L21.2 18.6L18.4 21.4L15.6 18.6L18.4 15.8L17 14.4L14.2 17.2L12.6 12Z"/></svg>
           </div>
-          <span>SAPPHIRE</span>
+          <span id="slot-key-label-1">SAPPHIRE</span>
         </div>
 
-        <!-- Topaz Key -->
-        <div class="key-slot" id="slot-topaz">
+        <!-- Key Slot 2 -->
+        <div class="key-slot" id="slot-key-2">
           <div class="key-icon">
             <svg viewBox="0 0 24 24"><path d="M7 14A2 2 0 0 1 5 12A2 2 0 0 1 7 10A2 2 0 0 1 9 12A2 2 0 0 1 7 14M12.6 12C12.8 11.4 13 10.7 13 10A6 6 0 0 0 7 4A6 6 0 0 0 1 10A6 6 0 0 0 7 16C7.7 16 8.4 15.8 9 15.6L18 24.6L22.6 20L21.2 18.6L18.4 21.4L15.6 18.6L18.4 15.8L17 14.4L14.2 17.2L12.6 12Z"/></svg>
           </div>
-          <span>TOPAZ</span>
+          <span id="slot-key-label-2">TOPAZ</span>
         </div>
       </div>
     </div>
@@ -731,15 +853,26 @@
 
   <!-- Title / Start Modal -->
   <div class="modal-screen" id="title-screen">
-    <h1 class="game-title">LABYRINTH</h1>
-    <div class="game-subtitle">OF THE DREAD WALKER</div>
+    <div class="world-select-group">
+      <button class="world-card-btn active" id="btn-world-1" data-world="1">
+        <span class="world-card-title">WORLD 1</span>
+        <span class="world-card-sub">THE LABYRINTH</span>
+      </button>
+      <button class="world-card-btn w2 locked" id="btn-world-2" data-world="2">
+        <span class="world-card-title" id="w2-card-title">WORLD 2 🔒</span>
+        <span class="world-card-sub" id="w2-card-sub">THE ABYSSAL CRYPT</span>
+      </button>
+    </div>
 
-    <div class="story-card">
+    <h1 class="game-title" id="title-main-header">LABYRINTH</h1>
+    <div class="game-subtitle" id="title-sub-header">OF THE DREAD WALKER</div>
+
+    <div class="story-card" id="title-story-card">
       You are trapped in a sprawling subterranean labyrinth.
       An eldritch stalker wanders these damp stone halls, hunting in the dark.<br><br>
       <strong>OBJECTIVE:</strong> Search the deep chambers to locate all <strong>3 Ancient Keys</strong>,
       then find the fortified <strong>South Exit Gate</strong> to escape alive.
-      <div class="key-objective-preview">
+      <div class="key-objective-preview" id="key-preview-container">
         <div class="key-preview-item" style="color:#f87171;">◆ Ruby Key</div>
         <div class="key-preview-item" style="color:#60a5fa;">◆ Sapphire Key</div>
         <div class="key-preview-item" style="color:#fbbf24;">◆ Topaz Key</div>
@@ -791,8 +924,8 @@
 
   <!-- Victory Modal -->
   <div class="modal-screen" id="victory-screen" style="display: none;">
-    <h1 class="game-title" style="color: #34d399; text-shadow: 0 0 40px #10b981;">YOU ESCAPED</h1>
-    <div class="game-subtitle">YOU UNLOCKED THE GATE AND SURVIVED THE LABYRINTH</div>
+    <h1 class="game-title" id="victory-title" style="color: #34d399; text-shadow: 0 0 40px #10b981;">YOU ESCAPED</h1>
+    <div class="game-subtitle" id="victory-subtitle">YOU UNLOCKED THE GATE AND SURVIVED THE LABYRINTH</div>
 
     <div class="result-stats">
       <div class="stat-box">
@@ -800,7 +933,7 @@
         <div class="stat-label">ESCAPE TIME</div>
       </div>
       <div class="stat-box">
-        <div class="stat-number" style="color: #34d399;">3 / 3</div>
+        <div class="stat-number" id="stats-keys-win" style="color: #34d399;">3 / 3</div>
         <div class="stat-label">KEYS ACQUIRED</div>
       </div>
       <div class="stat-box">
@@ -809,7 +942,11 @@
       </div>
     </div>
 
-    <button class="btn-primary" id="playagain-btn" style="background: linear-gradient(135deg, #059669, #047857); border-color:#10b981; box-shadow:0 0 25px rgba(16, 185, 129, 0.5);">PLAY AGAIN</button>
+    <div class="btn-group" id="victory-btn-group">
+      <button class="btn-primary" id="btn-enter-world2" style="background: linear-gradient(135deg, #7c3aed, #6d28d9); border-color:#a855f7; box-shadow:0 0 25px rgba(168, 85, 247, 0.6); display: none;">ENTER WORLD 2: THE ABYSS</button>
+      <button class="btn-primary" id="playagain-btn" style="background: linear-gradient(135deg, #059669, #047857); border-color:#10b981; box-shadow:0 0 25px rgba(16, 185, 129, 0.5);">PLAY AGAIN</button>
+      <button class="btn-primary" id="victory-menu-btn" style="background: #1e293b; border-color: #475569; box-shadow: none; font-size: 15px; padding: 10px 32px;">RETURN TO MENU</button>
+    </div>
   </div>
 
   <!-- Pause Modal -->

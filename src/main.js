@@ -19,17 +19,22 @@ class Game {
   constructor() {
     this.state = GAME_STATE.MENU;
 
+    // World & Level tracking
+    this.currentWorld = 1;
+    this.unlockedWorld2 = false;
+    try {
+      if (localStorage.getItem('horror_world2_unlocked') === 'true') {
+        this.unlockedWorld2 = true;
+      }
+    } catch (e) {}
+
     // Time tracking
     this.lastFrameTime = performance.now();
     this.gameTotalTime = 0;
     this.elapsedTime = 0;
 
     // Keys state
-    this.collectedKeys = {
-      ruby: false,
-      sapphire: false,
-      topaz: false
-    };
+    this.collectedKeys = {};
     this.keysCount = 0;
 
     // Audio
@@ -37,6 +42,10 @@ class Game {
 
     // UI
     this.ui = new UIController();
+    this.ui.updateWorldUnlockState(this.unlockedWorld2);
+    this.ui.setupWorldButtons((worldLevel) => {
+      this.currentWorld = worldLevel;
+    });
 
     // Three.js Core
     this.container = document.getElementById('canvas-container');
@@ -55,12 +64,12 @@ class Game {
     this.container.appendChild(this.renderer.domElement);
 
     // Ambient underground lighting
-    const ambientLight = new THREE.AmbientLight(0x2a3248, 1.2);
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0x2a3248, 1.2);
+    this.scene.add(this.ambientLight);
 
     // Soft ceiling/ground bounce light
-    const hemiLight = new THREE.HemisphereLight(0x3d4963, 0x1e2029, 0.85);
-    this.scene.add(hemiLight);
+    this.hemiLight = new THREE.HemisphereLight(0x3d4963, 0x1e2029, 0.85);
+    this.scene.add(this.hemiLight);
 
     // Player
     this.player = new Player(this.camera, this.renderer.domElement, this.sound);
@@ -113,22 +122,42 @@ class Game {
     const startBtn = document.getElementById('start-btn');
     startBtn.addEventListener('click', () => {
       this.sound.init();
-      this.startNewGame();
+      this.startNewGame(this.currentWorld);
     });
 
     // Retry Button
     const retryBtn = document.getElementById('retry-btn');
     retryBtn.addEventListener('click', () => {
       this.sound.resume();
-      this.startNewGame();
+      this.startNewGame(this.currentWorld);
     });
 
-    // Play Again Button
+    // Play Again Button (Replay active world)
     const playagainBtn = document.getElementById('playagain-btn');
     playagainBtn.addEventListener('click', () => {
       this.sound.resume();
-      this.startNewGame();
+      this.startNewGame(this.currentWorld);
     });
+
+    // Enter World 2 Button (Appears on victory screen after beating World 1)
+    const enterWorld2Btn = document.getElementById('btn-enter-world2');
+    if (enterWorld2Btn) {
+      enterWorld2Btn.addEventListener('click', () => {
+        this.sound.resume();
+        this.currentWorld = 2;
+        this.ui.selectWorld(2);
+        this.startNewGame(2);
+      });
+    }
+
+    // Victory Return to Menu Button
+    const victoryMenuBtn = document.getElementById('victory-menu-btn');
+    if (victoryMenuBtn) {
+      victoryMenuBtn.addEventListener('click', () => {
+        this.state = GAME_STATE.MENU;
+        this.ui.showTitle();
+      });
+    }
 
     // Resume Button
     const resumeBtn = document.getElementById('resume-btn');
@@ -144,7 +173,30 @@ class Game {
     });
   }
 
-  startNewGame() {
+  startNewGame(worldLevel = this.currentWorld) {
+    this.currentWorld = worldLevel;
+
+    // Apply World-specific Atmosphere & Lighting
+    if (this.currentWorld === 2) {
+      this.scene.background.setHex(0x140409);
+      this.scene.fog.color.setHex(0x140409);
+      this.scene.fog.density = 0.024;
+      this.ambientLight.color.setHex(0x3d101c);
+      this.ambientLight.intensity = 1.35;
+      this.hemiLight.color.setHex(0x4a1420);
+      this.hemiLight.groundColor.setHex(0x1a060b);
+      this.hemiLight.intensity = 0.9;
+    } else {
+      this.scene.background.setHex(0x0a0c16);
+      this.scene.fog.color.setHex(0x0c0f1a);
+      this.scene.fog.density = 0.022;
+      this.ambientLight.color.setHex(0x2a3248);
+      this.ambientLight.intensity = 1.2;
+      this.hemiLight.color.setHex(0x3d4963);
+      this.hemiLight.groundColor.setHex(0x1e2029);
+      this.hemiLight.intensity = 0.85;
+    }
+
     // Clear previous game entities from scene if any
     if (this.maze) this.scene.remove(this.maze.group);
     if (this.monster) this.scene.remove(this.monster.group);
@@ -154,21 +206,31 @@ class Game {
 
     // Reset game state
     this.ui.hideJumpscareOverlay();
-    this.collectedKeys = { ruby: false, sapphire: false, topaz: false };
+    this.collectedKeys = {};
     this.keysCount = 0;
+    this.ui.setWorld(this.currentWorld);
     this.ui.updateKeys(this.collectedKeys);
 
-    // Determine maze size by difficulty (balanced compact & challenging)
-    let mazeDimension = 21;
-    if (this.ui.selectedDifficulty === 'easy') mazeDimension = 17;
-    if (this.ui.selectedDifficulty === 'hard') mazeDimension = 25;
+    // Determine maze size by difficulty
+    let mazeDimension;
+    if (this.currentWorld === 2) {
+      // World 2: Larger and more winding
+      mazeDimension = 25;
+      if (this.ui.selectedDifficulty === 'easy') mazeDimension = 21;
+      if (this.ui.selectedDifficulty === 'hard') mazeDimension = 29;
+    } else {
+      // World 1
+      mazeDimension = 21;
+      if (this.ui.selectedDifficulty === 'easy') mazeDimension = 17;
+      if (this.ui.selectedDifficulty === 'hard') mazeDimension = 25;
+    }
 
     // Generate Maze
-    this.maze = new Maze(mazeDimension);
+    this.maze = new Maze(mazeDimension, this.currentWorld);
     this.maze.build3DWorld(this.scene);
 
     // Setup Exit Gate
-    this.exitGate = new ExitGate(this.maze.exitPos);
+    this.exitGate = new ExitGate(this.maze.exitPos, this.currentWorld);
     this.scene.add(this.exitGate.group);
 
     // Spawn 3 Keys
@@ -181,17 +243,35 @@ class Game {
     // Position Player at Spawn Safe Room
     this.player.resetPosition(this.maze.spawnPos);
 
-    // Spawn Monster at distant open cell
-    this.monster = new Monster(this.scene, this.maze, this.sound);
+    // Spawn Monster
+    this.monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
     this.spawnMonsterFarAway();
 
-    // Adjust monster difficulty (always keeping monster slower than player's 4.4 walkSpeed)
-    if (this.ui.selectedDifficulty === 'easy') {
-      this.monster.patrolSpeed = 1.6;
-      this.monster.chaseSpeed = 3.1;
-    } else if (this.ui.selectedDifficulty === 'hard') {
-      this.monster.patrolSpeed = 2.1;
-      this.monster.chaseSpeed = 3.9;
+    // Adjust monster difficulty
+    if (this.currentWorld === 2) {
+      // World 2: Abyssal Stalker is aggressive and faster than player's 4.4 walkSpeed!
+      if (this.ui.selectedDifficulty === 'easy') {
+        this.monster.patrolSpeed = 2.2;
+        this.monster.chaseSpeed = 4.45;
+      } else if (this.ui.selectedDifficulty === 'hard') {
+        this.monster.patrolSpeed = 2.8;
+        this.monster.chaseSpeed = 5.2;
+      } else {
+        this.monster.patrolSpeed = 2.5;
+        this.monster.chaseSpeed = 4.75;
+      }
+    } else {
+      // World 1: Dread Walker is slower than player's 4.4 walkSpeed
+      if (this.ui.selectedDifficulty === 'easy') {
+        this.monster.patrolSpeed = 1.6;
+        this.monster.chaseSpeed = 3.1;
+      } else if (this.ui.selectedDifficulty === 'hard') {
+        this.monster.patrolSpeed = 2.1;
+        this.monster.chaseSpeed = 3.9;
+      } else {
+        this.monster.patrolSpeed = 1.9;
+        this.monster.chaseSpeed = 3.6;
+      }
     }
 
     // Hide modals and show HUD
@@ -201,7 +281,11 @@ class Game {
     this.ui.pauseScreen.style.display = 'none';
     this.ui.showHUD();
 
-    this.ui.notify('Find 3 Ancient Keys to unlock the South Exit Gate...');
+    if (this.currentWorld === 2) {
+      this.ui.notify('WORLD 2: Recover 3 Abyssal Relics to escape through the Void Portal. SPRINT to survive!', 5000);
+    } else {
+      this.ui.notify('Find 3 Ancient Keys to unlock the South Exit Gate...', 4000);
+    }
 
     this.lastFrameTime = performance.now();
     this.gameTotalTime = 0;
@@ -382,7 +466,10 @@ class Game {
             setTimeout(() => {
               this.sound.playGateUnlocked();
               this.exitGate.unlock();
-              this.ui.notify('ALL 3 KEYS ACQUIRED! THE SOUTH EXIT GATE IS UNLOCKED! ESCAPE!', 6000);
+              const unlockMsg = (this.currentWorld === 2)
+                ? 'ALL 3 ABYSSAL RELICS ACQUIRED! THE VOID PORTAL IS ACTIVE! ESCAPE!'
+                : 'ALL 3 KEYS ACQUIRED! THE SOUTH EXIT GATE IS UNLOCKED! ESCAPE!';
+              this.ui.notify(unlockMsg, 6000);
             }, 800);
           }
         }
@@ -507,7 +594,7 @@ class Game {
     if (progress >= 1.0) {
       this.state = GAME_STATE.GAMEOVER;
       this.ui.hideJumpscareOverlay();
-      this.ui.showGameOver(this.elapsedTime, this.keysCount);
+      this.ui.showGameOver(this.elapsedTime, this.keysCount, this.currentWorld);
     }
   }
 
@@ -515,7 +602,17 @@ class Game {
     this.state = GAME_STATE.VICTORY;
     this.player.controls.unlock();
     this.sound.playVictory();
-    this.ui.showVictory(this.elapsedTime);
+
+    if (this.currentWorld === 1) {
+      this.unlockedWorld2 = true;
+      try {
+        localStorage.setItem('horror_world2_unlocked', 'true');
+      } catch (e) {}
+      this.ui.updateWorldUnlockState(true);
+      this.ui.showVictory(this.elapsedTime, 1);
+    } else {
+      this.ui.showVictory(this.elapsedTime, 2);
+    }
   }
 }
 

@@ -5,9 +5,10 @@ export const CELL_SIZE = 4.0;
 export const WALL_HEIGHT = 3.6;
 
 export class Maze {
-  constructor(size = 29) {
+  constructor(size = 29, worldLevel = 1) {
     // Ensure size is odd
     this.size = (size % 2 === 0) ? size + 1 : size;
+    this.worldLevel = worldLevel;
     this.grid = []; // 1 = wall, 0 = open path
     this.spawnPos = new THREE.Vector3();
     this.exitPos = new THREE.Vector3();
@@ -158,11 +159,19 @@ export class Maze {
     const k2 = candidatesQ2[0] || { x: s - 2, z: 1 };
     const k3 = candidatesQ3[0] || { x: s - 2, z: s - 2 };
 
-    this.keyPositions = [
-      { id: 'ruby', name: 'Blood Ruby Key', color: 0xef4444, pos: this.gridToWorld(k1.x, k1.z), grid: k1 },
-      { id: 'sapphire', name: 'Void Sapphire Key', color: 0x3b82f6, pos: this.gridToWorld(k2.x, k2.z), grid: k2 },
-      { id: 'topaz', name: 'Elder Sun Key', color: 0xf59e0b, pos: this.gridToWorld(k3.x, k3.z), grid: k3 }
-    ];
+    if (this.worldLevel === 2) {
+      this.keyPositions = [
+        { id: 'amethyst', name: 'Void Amethyst Key', color: 0xa855f7, pos: this.gridToWorld(k1.x, k1.z), grid: k1 },
+        { id: 'emerald', name: 'Soul Emerald Key', color: 0x10b981, pos: this.gridToWorld(k2.x, k2.z), grid: k2 },
+        { id: 'crimson', name: 'Abyssal Eye Key', color: 0xf43f5e, pos: this.gridToWorld(k3.x, k3.z), grid: k3 }
+      ];
+    } else {
+      this.keyPositions = [
+        { id: 'ruby', name: 'Blood Ruby Key', color: 0xef4444, pos: this.gridToWorld(k1.x, k1.z), grid: k1 },
+        { id: 'sapphire', name: 'Void Sapphire Key', color: 0x3b82f6, pos: this.gridToWorld(k2.x, k2.z), grid: k2 },
+        { id: 'topaz', name: 'Elder Sun Key', color: 0xf59e0b, pos: this.gridToWorld(k3.x, k3.z), grid: k3 }
+      ];
+    }
   }
 
   build3DWorld(scene) {
@@ -171,7 +180,9 @@ export class Maze {
 
     // Floor
     const floorGeo = new THREE.PlaneGeometry(totalWorldSize, totalWorldSize);
-    const floorTex = TextureGenerator.createFloorTexture();
+    const floorTex = (this.worldLevel === 2)
+      ? TextureGenerator.createAbyssalFloorTexture()
+      : TextureGenerator.createFloorTexture();
     floorTex.repeat.set(s, s);
     const floorMat = new THREE.MeshStandardMaterial({
       map: floorTex,
@@ -209,7 +220,9 @@ export class Maze {
     }
 
     const wallGeo = new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE);
-    const wallTex = TextureGenerator.createWallTexture();
+    const wallTex = (this.worldLevel === 2)
+      ? TextureGenerator.createAbyssalWallTexture()
+      : TextureGenerator.createWallTexture();
     wallTex.repeat.set(1, 1);
     const wallMat = new THREE.MeshStandardMaterial({
       map: wallTex,
@@ -269,7 +282,14 @@ export class Maze {
   }
 
   addBloodDecals() {
-    const decalTexts = [
+    const decalTexts = (this.worldLevel === 2) ? [
+      'IT RUNS FASTER THAN YOU',
+      'THE APEX HUNTS',
+      'STAMINA WILL FAIL YOU',
+      'HEAR ITS TALONS',
+      'NO ESCAPE FROM ABYSS',
+      'DO NOT STOP'
+    ] : [
       'FIND 3 KEYS',
       'HE HEARS SPRINTING',
       'DONT LOOK BACK',
@@ -326,19 +346,20 @@ export class Maze {
 
           // Ember bulb
           const bulbGeo = new THREE.SphereGeometry(0.1, 8, 8);
-          const bulbMat = new THREE.MeshBasicMaterial({ color: 0xff7733 });
+          const bulbMat = new THREE.MeshBasicMaterial({ color: (this.worldLevel === 2) ? 0xff2255 : 0xff7733 });
           const bulb = new THREE.Mesh(bulbGeo, bulbMat);
           bulb.position.set(wPos.x, 2.2, wPos.z);
           this.group.add(bulb);
 
-          // Warm flickering torchlight
-          const torchLight = new THREE.PointLight(0xff8833, 1.8, 13.0, 1.5);
+          // Torchlight (Abyssal Crimson in World 2, Warm Amber in World 1)
+          const torchColor = (this.worldLevel === 2) ? 0xff1844 : 0xff8833;
+          const torchLight = new THREE.PointLight(torchColor, (this.worldLevel === 2) ? 2.1 : 1.8, 14.0, 1.5);
           torchLight.position.set(wPos.x, 2.3, wPos.z);
           this.group.add(torchLight);
 
           this.torches.push({
             light: torchLight,
-            baseIntensity: 1.8,
+            baseIntensity: (this.worldLevel === 2) ? 2.1 : 1.8,
             offset: Math.random() * 10
           });
         }
