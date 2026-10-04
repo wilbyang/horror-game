@@ -41,10 +41,10 @@ class Game {
     // Three.js Core
     this.container = document.getElementById('canvas-container');
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x030305);
-    this.scene.fog = new THREE.FogExp2(0x040407, 0.042);
+    this.scene.background = new THREE.Color(0x0a0c16);
+    this.scene.fog = new THREE.FogExp2(0x0c0f1a, 0.022);
 
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 120);
     this.scene.add(this.camera);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -54,9 +54,13 @@ class Game {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.container.appendChild(this.renderer.domElement);
 
-    // Ambient moonlight / dark underground ambient
-    const ambientLight = new THREE.AmbientLight(0x080912, 0.45);
+    // Ambient underground lighting
+    const ambientLight = new THREE.AmbientLight(0x2a3248, 1.2);
     this.scene.add(ambientLight);
+
+    // Soft ceiling/ground bounce light
+    const hemiLight = new THREE.HemisphereLight(0x3d4963, 0x1e2029, 0.85);
+    this.scene.add(hemiLight);
 
     // Player
     this.player = new Player(this.camera, this.renderer.domElement, this.sound);

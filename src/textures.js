@@ -8,7 +8,7 @@ export class TextureGenerator {
     const ctx = canvas.getContext('2d');
 
     // Base dark stone color
-    ctx.fillStyle = '#1c1c20';
+    ctx.fillStyle = '#2a2b34';
     ctx.fillRect(0, 0, 512, 512);
 
     // Stone brick grid
@@ -24,8 +24,8 @@ export class TextureGenerator {
         const y = r * rowHeight;
 
         // Random subtle brick tint
-        const shade = 28 + Math.floor(Math.random() * 20);
-        ctx.fillStyle = `rgb(${shade}, ${shade - 2}, ${shade + 2})`;
+        const shade = 48 + Math.floor(Math.random() * 24);
+        ctx.fillStyle = `rgb(${shade}, ${shade - 2}, ${shade + 4})`;
         ctx.fillRect(x + 2, y + 2, colWidth - 4, rowHeight - 4);
 
         // Brick surface noise
@@ -87,14 +87,14 @@ export class TextureGenerator {
     const ctx = canvas.getContext('2d');
 
     // Damp dark flagstones
-    ctx.fillStyle = '#141418';
+    ctx.fillStyle = '#22232c';
     ctx.fillRect(0, 0, 512, 512);
 
     const gridSize = 64;
     for (let x = 0; x < 512; x += gridSize) {
       for (let y = 0; y < 512; y += gridSize) {
-        const v = 22 + Math.floor(Math.random() * 14);
-        ctx.fillStyle = `rgb(${v}, ${v + 1}, ${v + 3})`;
+        const v = 38 + Math.floor(Math.random() * 20);
+        ctx.fillStyle = `rgb(${v}, ${v + 1}, ${v + 4})`;
         ctx.fillRect(x + 2, y + 2, gridSize - 4, gridSize - 4);
 
         // Cracks
@@ -151,14 +151,14 @@ export class TextureGenerator {
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0c0c10';
+    ctx.fillStyle = '#1c1c24';
     ctx.fillRect(0, 0, 256, 256);
 
     // Rough rocky texture noise
     for (let i = 0; i < 400; i++) {
       const x = Math.random() * 256;
       const y = Math.random() * 256;
-      const s = 12 + Math.floor(Math.random() * 16);
+      const s = 24 + Math.floor(Math.random() * 20);
       ctx.fillStyle = `rgb(${s}, ${s}, ${s})`;
       ctx.fillRect(x, y, 4, 4);
     }

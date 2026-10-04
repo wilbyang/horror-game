@@ -45,7 +45,7 @@ export class Player {
   }
 
   setupFlashlight() {
-    this.flashlight = new THREE.SpotLight(0xfff6e0, 3.8, 28, Math.PI / 6.5, 0.45, 1.8);
+    this.flashlight = new THREE.SpotLight(0xfffaea, 5.2, 38, Math.PI / 5.2, 0.45, 1.4);
     this.flashlight.position.set(0.2, -0.2, 0); // Mounted slightly right of player eyes
 
     this.flashlightTarget = new THREE.Object3D();
@@ -55,8 +55,8 @@ export class Player {
     this.camera.add(this.flashlightTarget);
     this.flashlight.target = this.flashlightTarget;
 
-    // Subtle soft ambient glow around the player
-    this.playerAura = new THREE.PointLight(0xffeedd, 0.35, 3.5);
+    // Ambient glow around the player illuminating nearby walls & floor
+    this.playerAura = new THREE.PointLight(0xffeedd, 1.1, 7.5, 1.6);
     this.camera.add(this.playerAura);
   }
 
@@ -231,7 +231,7 @@ export class Player {
     const camPos = this.camera.position;
     const toTarget = new THREE.Vector3().subVectors(targetPos, camPos);
     const dist = toTarget.length();
-    if (dist > 18) return false; // Out of flashlight reach
+    if (dist > 26) return false; // Out of flashlight reach
 
     toTarget.normalize();
     const camDir = new THREE.Vector3();

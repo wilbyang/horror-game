@@ -310,10 +310,10 @@ export class Maze {
 
   addTorches() {
     const s = this.size;
-    // Place a few dim atmospheric sconces at key crossroads
-    const torchSpacing = 8;
-    for (let z = 4; z < s - 4; z += torchSpacing) {
-      for (let x = 4; x < s - 4; x += torchSpacing) {
+    // Place atmospheric sconces at crossroads
+    const torchSpacing = 5;
+    for (let z = 3; z < s - 3; z += torchSpacing) {
+      for (let x = 3; x < s - 3; x += torchSpacing) {
         if (this.grid[z][x] === 0) {
           const wPos = this.gridToWorld(x, z);
 
@@ -326,19 +326,19 @@ export class Maze {
 
           // Ember bulb
           const bulbGeo = new THREE.SphereGeometry(0.1, 8, 8);
-          const bulbMat = new THREE.MeshBasicMaterial({ color: 0xff6622 });
+          const bulbMat = new THREE.MeshBasicMaterial({ color: 0xff7733 });
           const bulb = new THREE.Mesh(bulbGeo, bulbMat);
           bulb.position.set(wPos.x, 2.2, wPos.z);
           this.group.add(bulb);
 
-          // Dim flickering light
-          const torchLight = new THREE.PointLight(0xff7722, 0.8, 8.5, 1.8);
+          // Warm flickering torchlight
+          const torchLight = new THREE.PointLight(0xff8833, 1.8, 13.0, 1.5);
           torchLight.position.set(wPos.x, 2.3, wPos.z);
           this.group.add(torchLight);
 
           this.torches.push({
             light: torchLight,
-            baseIntensity: 0.8,
+            baseIntensity: 1.8,
             offset: Math.random() * 10
           });
         }
@@ -349,8 +349,8 @@ export class Maze {
   updateTorches(time) {
     for (const t of this.torches) {
       // Subtle organic flame flicker
-      const flicker = Math.sin(time * 8 + t.offset) * 0.15 + Math.cos(time * 19 + t.offset) * 0.1;
-      t.light.intensity = Math.max(0.2, t.baseIntensity + flicker);
+      const flicker = Math.sin(time * 8 + t.offset) * 0.2 + Math.cos(time * 19 + t.offset) * 0.12;
+      t.light.intensity = Math.max(1.1, t.baseIntensity + flicker);
     }
   }
 
