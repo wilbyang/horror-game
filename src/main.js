@@ -299,8 +299,11 @@ class Game {
     // Update Monster AI with camera for spatial 3D audio
     this.monster.update(delta, playerPos, playerNoise, isLightingMonster, this.camera);
 
-    // Distance to monster
-    const monsterDist = this.monster.group.position.distanceTo(playerPos);
+    // Flat horizontal distance to monster in maze
+    const monsterDist = Math.hypot(
+      this.monster.group.position.x - playerPos.x,
+      this.monster.group.position.z - playerPos.z
+    );
     const isChasing = (this.monster.state === MONSTER_STATE.CHASE);
 
     // Subtle physical ground rumble when heavy monster is stomping nearby
@@ -333,7 +336,8 @@ class Game {
     );
 
     // Catch / Jumpscare check: Monster caught player!
-    if (monsterDist < 1.35) {
+    // Player radius (0.5) + Monster radius (0.65) + Claw strike reach (0.8) = 1.95m
+    if (monsterDist < 1.95) {
       this.triggerGameOverCatch();
     }
   }
@@ -421,6 +425,28 @@ class Game {
     this.jumpscarePlayerPos = this.camera.position.clone();
     this.jumpscareCamBaseY = this.camera.position.y;
 
+    // Place monster immediately 1.15m in front of the camera, directly facing player
+    const monsterDir = new THREE.Vector3().subVectors(this.monster.group.position, this.camera.position);
+    monsterDir.y = 0;
+    if (monsterDir.length() < 0.2) {
+      this.camera.getWorldDirection(monsterDir);
+      monsterDir.y = 0;
+    }
+    monsterDir.normalize();
+
+    this.monster.group.position.copy(this.camera.position).addScaledVector(monsterDir, 1.15);
+    this.monster.group.position.y = 0;
+
+    // Face monster directly towards camera
+    this.monster.group.rotation.y = Math.atan2(-monsterDir.x, -monsterDir.z);
+
+    // Lock camera directly on monster head
+    this.monster.group.updateMatrixWorld(true);
+    const headPos = new THREE.Vector3();
+    this.monster.head.getWorldPosition(headPos);
+    this.camera.lookAt(headPos);
+
+    this.ui.hideHUD();
     this.ui.startJumpscareOverlay();
   }
 
@@ -431,32 +457,47 @@ class Game {
     // 1. Monster lunges into the camera lens with unhinged jaws and reaching claws
     this.monster.animateJumpscareLunge(progress, this.camera.position);
 
-    // Move monster rapidly up to 0.45m from the camera face
+    // Monster moves right up in front of the camera (head distance ~0.6m)
     const toCam = new THREE.Vector3().subVectors(this.camera.position, this.monster.group.position);
     toCam.y = 0;
-    if (toCam.length() > 0.45) {
+    if (toCam.length() > 0.85) {
       toCam.normalize();
-      this.monster.group.position.addScaledVector(toCam, delta * 5.2);
+      this.monster.group.position.addScaledVector(toCam, delta * 3.5);
     }
 
-    // Camera locks directly on monster's terrifying gaping maw & glowing eyes
-    const monsterMaw = new THREE.Vector3(
-      this.monster.group.position.x,
-      this.monster.group.position.y + 1.85,
-      this.monster.group.position.z
-    );
-    this.camera.lookAt(monsterMaw);
-
     // Violent screen trauma vibration
-    const shake = Math.sin(elapsed * 48) * Math.max(0.02, (1.0 - progress) * 0.12);
+    const shake = Math.sin(elapsed * 52) * Math.max(0.015, (1.0 - progress) * 0.12);
     this.camera.position.x = this.jumpscarePlayerPos.x + (Math.random() - 0.5) * shake;
     this.camera.position.z = this.jumpscarePlayerPos.z + (Math.random() - 0.5) * shake;
 
-    // Player collapses to the bloody stone floor
-    if (progress > 0.35) {
-      const fallProg = Math.min(1.0, (progress - 0.35) / 0.45);
-      this.camera.position.y = THREE.MathUtils.lerp(this.jumpscareCamBaseY, 0.35, fallProg);
-      this.camera.rotation.z += Math.sin(fallProg * Math.PI * 0.5) * 0.65;
+    // Keep camera at full eye height for the jumpscare so the roaring head is front-and-center!
+    // Only in the final fatal bite (progress > 0.8) does the camera collapse
+    let rollTilt = (Math.random() - 0.5) * 0.04;
+    if (progress > 0.8) {
+      const deathProg = (progress - 0.8) / 0.2;
+      this.camera.position.y = THREE.MathUtils.lerp(this.jumpscareCamBaseY, 0.45, deathProg);
+      rollTilt = Math.sin(deathProg * Math.PI * 0.5) * 0.5;
+    } else {
+      this.camera.position.y = this.jumpscareCamBaseY;
+    }
+
+    // Camera locks directly on monster's terrifying gaping head & glowing eyes
+    this.monster.group.updateMatrixWorld(true);
+    const headWorldPos = new THREE.Vector3();
+    this.monster.head.getWorldPosition(headWorldPos);
+    this.camera.lookAt(headWorldPos);
+    if (rollTilt !== 0) {
+      this.camera.rotation.z += rollTilt;
+    }
+
+    // Flashlight illuminates monster's head with dramatic bright flickering
+    if (this.player.flashlight) {
+      this.player.flashlight.visible = true;
+      if (progress < 0.8) {
+        this.player.flashlight.intensity = (Math.random() > 0.08) ? (5.5 + Math.random() * 3.5) : 1.0;
+      } else {
+        this.player.flashlight.intensity = 0;
+      }
     }
 
     // 2. Render 2D arterial gore, claw scratches & blood drip overlay

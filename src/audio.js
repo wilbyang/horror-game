@@ -470,7 +470,10 @@ export class SoundEngine {
 
   // Visceral Jumpscare Kill Sound
   playJumpscare() {
-    if (!this.ctx || this.ctx.state !== 'running') return;
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
     const now = this.ctx.currentTime;
 
     // 1. Bone Crunch / Flesh Tear Transient

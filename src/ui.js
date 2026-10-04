@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 export class UIController {
   constructor() {
     // Overlays
@@ -365,31 +367,44 @@ export class UIController {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // Generate persistent arterial blood splatters for this kill
+    // Generate persistent arterial blood splatters framing the screen perimeter
     this.bloodSplatters = [];
-    const count = 28;
+    const count = 30;
     for (let i = 0; i < count; i++) {
+      let sx, sy;
+      // 85% of splatters hit the outer edges to keep the center completely clear for the monster's head
+      if (Math.random() < 0.85) {
+        const edge = Math.floor(Math.random() * 4);
+        if (edge === 0) { sx = Math.random() * canvas.width; sy = Math.random() * canvas.height * 0.22; }
+        else if (edge === 1) { sx = Math.random() * canvas.width; sy = canvas.height * 0.78 + Math.random() * canvas.height * 0.22; }
+        else if (edge === 2) { sx = Math.random() * canvas.width * 0.22; sy = Math.random() * canvas.height; }
+        else { sx = canvas.width * 0.78 + Math.random() * canvas.width * 0.22; sy = Math.random() * canvas.height; }
+      } else {
+        sx = Math.random() * canvas.width;
+        sy = Math.random() * canvas.height;
+      }
+
       this.bloodSplatters.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        maxRadius: 18 + Math.random() * 55,
-        dripLength: 30 + Math.random() * 120,
+        x: sx,
+        y: sy,
+        maxRadius: 16 + Math.random() * 45,
+        dripLength: 25 + Math.random() * 110,
         dripSpeed: 40 + Math.random() * 80,
         dripWidth: 2 + Math.random() * 4,
-        appearTime: 0.15 + Math.random() * 0.45,
+        appearTime: 0.25 + Math.random() * 0.45,
         droplets: Array.from({ length: 4 }, () => ({
-          ox: (Math.random() - 0.5) * 40,
-          oy: (Math.random() - 0.5) * 40,
-          rad: 2 + Math.random() * 6
+          ox: (Math.random() - 0.5) * 35,
+          oy: (Math.random() - 0.5) * 35,
+          rad: 2 + Math.random() * 5
         }))
       });
     }
 
-    // 3 Claw slash trajectories across camera lens
+    // 3 Claw slash trajectories across outer edges of camera lens
     this.clawSlashes = [
-      { x1: canvas.width * 0.15, y1: canvas.height * 0.1, x2: canvas.width * 0.45, y2: canvas.height * 0.85 },
-      { x1: canvas.width * 0.25, y1: canvas.height * 0.05, x2: canvas.width * 0.55, y2: canvas.height * 0.9 },
-      { x1: canvas.width * 0.35, y1: canvas.height * 0.08, x2: canvas.width * 0.65, y2: canvas.height * 0.88 }
+      { x1: canvas.width * 0.1, y1: canvas.height * 0.15, x2: canvas.width * 0.38, y2: canvas.height * 0.88 },
+      { x1: canvas.width * 0.2, y1: canvas.height * 0.08, x2: canvas.width * 0.48, y2: canvas.height * 0.92 },
+      { x1: canvas.width * 0.62, y1: canvas.height * 0.1, x2: canvas.width * 0.9, y2: canvas.height * 0.86 }
     ];
   }
 
@@ -402,16 +417,19 @@ export class UIController {
 
     ctx.clearRect(0, 0, w, h);
 
-    // Initial shock flash & chromatic trauma
-    if (progress < 0.2) {
-      const flashAlpha = (1 - progress / 0.2) * 0.45;
-      ctx.fillStyle = `rgba(220, 10, 20, ${flashAlpha})`;
+    // Initial shock radial flash (edges flash red, center remains crystal clear for the face)
+    if (progress < 0.22) {
+      const flashAlpha = (1 - progress / 0.22) * 0.45;
+      const fGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.18, w / 2, h / 2, w * 0.75);
+      fGrad.addColorStop(0, 'rgba(220, 10, 20, 0)');
+      fGrad.addColorStop(1, `rgba(220, 10, 20, ${flashAlpha})`);
+      ctx.fillStyle = fGrad;
       ctx.fillRect(0, 0, w, h);
     }
 
     // Claw slash gouges across lens
-    if (progress > 0.15) {
-      const slashProgress = Math.min(1.0, (progress - 0.15) / 0.25);
+    if (progress > 0.2) {
+      const slashProgress = Math.min(1.0, (progress - 0.2) / 0.25);
       ctx.strokeStyle = 'rgba(180, 10, 15, 0.85)';
       ctx.lineWidth = 4;
       ctx.shadowColor = 'rgba(120, 0, 0, 0.9)';
@@ -420,15 +438,15 @@ export class UIController {
       for (const slash of this.clawSlashes) {
         ctx.beginPath();
         ctx.moveTo(slash.x1, slash.y1);
-        const currX = THREE.MathUtils.lerp(slash.x1, slash.x2, slashProgress);
-        const currY = THREE.MathUtils.lerp(slash.y1, slash.y2, slashProgress);
+        const currX = slash.x1 + (slash.x2 - slash.x1) * slashProgress;
+        const currY = slash.y1 + (slash.y2 - slash.y1) * slashProgress;
         ctx.lineTo(currX, currY);
         ctx.stroke();
       }
       ctx.shadowBlur = 0;
     }
 
-    // Arterial Blood Splatters bursting onto the lens & dripping down
+    // Arterial Blood Splatters bursting onto perimeter of lens & dripping down
     for (const s of this.bloodSplatters) {
       if (progress >= s.appearTime) {
         const localProg = (progress - s.appearTime) / (1 - s.appearTime);
@@ -463,19 +481,19 @@ export class UIController {
       }
     }
 
-    // Red horror vignette tightening around screen
-    if (progress > 0.3) {
-      const vProg = (progress - 0.3) / 0.7;
-      const vGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.2, w / 2, h / 2, w * 0.65);
+    // Red horror vignette tightening around screen borders (center remains transparent)
+    if (progress > 0.35) {
+      const vProg = (progress - 0.35) / 0.65;
+      const vGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.7);
       vGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
       vGrad.addColorStop(1, `rgba(90, 0, 10, ${Math.min(0.85, vProg * 1.1)})`);
       ctx.fillStyle = vGrad;
       ctx.fillRect(0, 0, w, h);
     }
 
-    // Final Blackout Fade to Dead
-    if (progress > 0.72) {
-      const blackAlpha = Math.min(1.0, (progress - 0.72) / 0.28);
+    // Final Blackout Fade to Dead during the final lethal strike
+    if (progress > 0.82) {
+      const blackAlpha = Math.min(1.0, (progress - 0.82) / 0.18);
       ctx.fillStyle = `rgba(3, 2, 4, ${blackAlpha})`;
       ctx.fillRect(0, 0, w, h);
     }

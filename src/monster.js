@@ -215,6 +215,11 @@ export class Monster {
     this.head.add(this.eyeLight);
     this.eyeLight.target = eyeTarget;
 
+    // Intense horror illumination light for jumpscare (vividly lights up the face, fangs, and eyes)
+    this.jumpscareFaceLight = new THREE.PointLight(0xff2233, 0, 4.5, 1.2);
+    this.jumpscareFaceLight.position.set(0, 0.15, 0.55);
+    this.head.add(this.jumpscareFaceLight);
+
     // Upper Jaw & Fangs
     const upperJaw = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 0.28), boneMat);
     upperJaw.position.set(0, -0.06, 0.22);
@@ -436,7 +441,10 @@ export class Monster {
   update(delta, playerPos, playerNoise, playerLightingMonster, camera = null) {
     if (this.state === MONSTER_STATE.KILLING) return; // Managed by jumpscare sequence
 
-    const distToPlayer = this.group.position.distanceTo(playerPos);
+    const distToPlayer = Math.hypot(
+      this.group.position.x - playerPos.x,
+      this.group.position.z - playerPos.z
+    );
 
     // Stun cooldown recovery
     if (this.stunCooldown > 0) {
@@ -465,9 +473,15 @@ export class Monster {
     const hearingRadius = 11 * (playerNoise || 0.5);
     const canHear = distToPlayer < hearingRadius;
 
-    // Vision cone
+    // Vision cone (horizontal 2D plane)
     const monsterForward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.group.quaternion);
-    const toPlayer = new THREE.Vector3().subVectors(playerPos, this.group.position).normalize();
+    monsterForward.y = 0;
+    monsterForward.normalize();
+    const toPlayer = new THREE.Vector3(
+      playerPos.x - this.group.position.x,
+      0,
+      playerPos.z - this.group.position.z
+    ).normalize();
     const dot = monsterForward.dot(toPlayer);
     const inSightCone = dot > 0.25 || distToPlayer < 7.0;
 
@@ -506,12 +520,25 @@ export class Monster {
       }
     }
 
-    // Move along path
+    // Move along path or charge directly if clear line of sight
     let moveSpeed = this.patrolSpeed;
     if (this.state === MONSTER_STATE.CHASE) moveSpeed = this.chaseSpeed;
     if (this.state === MONSTER_STATE.INVESTIGATE) moveSpeed = this.investigateSpeed;
 
-    if (this.currentPath.length > 0 && this.pathIndex < this.currentPath.length) {
+    if (this.state === MONSTER_STATE.CHASE && (hasLOS || distToPlayer < 3.5)) {
+      // Direct sprint toward player when visible
+      const toDirect = new THREE.Vector3(
+        playerPos.x - this.group.position.x,
+        0,
+        playerPos.z - this.group.position.z
+      );
+      if (toDirect.length() > 0.1) {
+        toDirect.normalize();
+        this.group.position.addScaledVector(toDirect, moveSpeed * delta);
+        const targetRot = Math.atan2(toDirect.x, toDirect.z);
+        this.group.rotation.y = THREE.MathUtils.lerp(this.group.rotation.y, targetRot, 0.22);
+      }
+    } else if (this.currentPath.length > 0 && this.pathIndex < this.currentPath.length) {
       const targetWaypoint = this.currentPath[this.pathIndex];
       const targetFlat = new THREE.Vector3(targetWaypoint.x, this.group.position.y, targetWaypoint.z);
       const toWp = new THREE.Vector3().subVectors(targetFlat, this.group.position);
@@ -570,6 +597,13 @@ export class Monster {
     // Torso Hunched Posture & Bobbing
     this.torso.rotation.x = isChasing ? 0.38 : 0.18;
     this.torso.position.y = 1.65 + Math.abs(Math.sin(this.animTime * 2)) * 0.09;
+
+    // Reset jumpscare-specific head & arm scaling
+    this.head.position.set(0, 0.82, 0.24);
+    this.head.scale.set(1, 1, 1);
+    this.leftArm.position.set(-0.48, 0.42, 0);
+    this.rightArm.position.set(0.48, 0.42, 0);
+    if (this.jumpscareFaceLight) this.jumpscareFaceLight.intensity = 0;
 
     // Heart pulsation
     if (this.heart) {
@@ -636,34 +670,58 @@ export class Monster {
     this.torso.rotation.x = -0.25;
   }
 
-  // Cinematic Jumpscare Animation (Monster grabs the camera and tears the player apart!)
+  // Cinematic Jumpscare Animation (Monster's huge roaring head lunges right into your face!)
   animateJumpscareLunge(progress, cameraPos) {
     this.state = MONSTER_STATE.KILLING;
 
-    // Surge right up into the camera lens (distance ~ 0.5m)
-    const targetFacePos = new THREE.Vector3().copy(cameraPos);
-    this.group.lookAt(targetFacePos.x, this.group.position.y, targetFacePos.z);
+    // Face directly towards the camera lens (+Z faces camera)
+    const dx = cameraPos.x - this.group.position.x;
+    const dz = cameraPos.z - this.group.position.z;
+    if (Math.hypot(dx, dz) > 0.001) {
+      this.group.rotation.y = Math.atan2(dx, dz);
+    }
 
-    // Unhinge jaw wide open
-    this.jaw.rotation.x = THREE.MathUtils.lerp(0.2, 0.85, Math.min(1, progress * 2));
+    // Lower torso and tilt forward so head is dead level with camera eye height (1.65m)
+    this.torso.position.y = THREE.MathUtils.lerp(1.65, 1.15, Math.min(1, progress * 3));
+    this.torso.rotation.x = THREE.MathUtils.lerp(0.3, 0.55, Math.min(1, progress * 3));
 
-    // Hands reaching forward to grasp around the screen
-    this.leftArm.rotation.x = -1.6;
-    this.leftArm.rotation.y = 0.35;
-    this.leftArm.rotation.z = 0.3;
+    // Head thrusts forward right between the arms, right into the center of the camera
+    const lungeFwd = THREE.MathUtils.lerp(0.24, 0.72, Math.min(1, progress * 2.5));
+    const lungeY = THREE.MathUtils.lerp(0.82, 0.48, Math.min(1, progress * 2.5));
+    this.head.position.set(
+      (Math.random() - 0.5) * 0.04, // violent horror micro-jitter
+      lungeY + (Math.random() - 0.5) * 0.03,
+      lungeFwd
+    );
 
-    this.rightArm.rotation.x = -1.6;
-    this.rightArm.rotation.y = -0.35;
-    this.rightArm.rotation.z = -0.3;
+    // Make the terrifying demonic head 45% larger during the jumpscare so it fills the screen
+    const headScale = THREE.MathUtils.lerp(1.0, 1.45, Math.min(1, progress * 2));
+    this.head.scale.set(headScale, headScale, headScale);
 
-    this.leftForearm.rotation.x = 0.8;
-    this.rightForearm.rotation.x = 0.8;
+    // Unhinge jaw wide open with terrifying roaring and snapping teeth
+    const jawSnap = Math.sin(progress * 38) * 0.15;
+    this.jaw.rotation.x = THREE.MathUtils.lerp(0.35, 0.95, Math.min(1, progress * 2)) + jawSnap;
 
-    // Shivering violent head tremor
+    // Arms pull outward to the left and right borders of the screen to frame the roaring head
+    const clawSwipe = Math.sin(progress * 24) * 0.12;
+    this.leftArm.position.set(-0.72, 0.28, 0.2);
+    this.rightArm.position.set(0.72, 0.28, 0.2);
+
+    this.leftArm.rotation.set(-1.45, 0.45 + clawSwipe, 0.35);
+    this.rightArm.rotation.set(-1.45, -0.45 - clawSwipe, -0.35);
+
+    this.leftForearm.rotation.x = 0.95;
+    this.rightForearm.rotation.x = 0.95;
+
+    // Violent shivering head tremor (demonic possession stutter)
     this.head.rotation.z = (Math.random() - 0.5) * 0.25;
-    this.head.rotation.x = (Math.random() - 0.5) * 0.15;
+    this.head.rotation.x = THREE.MathUtils.lerp(0.1, -0.15, Math.min(1, progress * 3)) + (Math.random() - 0.5) * 0.15;
+    this.head.rotation.y = (Math.random() - 0.5) * 0.2;
 
-    // Eye spotlight surges with blinding terrifying red
-    this.eyeLight.intensity = 8.0 + Math.random() * 4.0;
+    // Blinding red eye spotlight & vivid face horror light
+    this.eyeLight.intensity = 16.0 + Math.random() * 8.0;
+    if (this.jumpscareFaceLight) {
+      this.jumpscareFaceLight.intensity = 9.0 + Math.random() * 5.0;
+    }
   }
 }
