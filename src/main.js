@@ -20,8 +20,8 @@ class Game {
     this.state = GAME_STATE.MENU;
 
     // Time tracking
-    this.clock = new THREE.Clock();
-    this.gameStartTime = 0;
+    this.lastFrameTime = performance.now();
+    this.gameTotalTime = 0;
     this.elapsedTime = 0;
 
     // Keys state
@@ -198,7 +198,8 @@ class Game {
 
     this.ui.notify('Find 3 Ancient Keys to unlock the South Exit Gate...');
 
-    this.clock.start();
+    this.lastFrameTime = performance.now();
+    this.gameTotalTime = 0;
     this.elapsedTime = 0;
     this.state = GAME_STATE.PLAYING;
 
@@ -252,15 +253,17 @@ class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  loop(currentTime) {
-    requestAnimationFrame((t) => this.loop(t));
+  loop() {
+    requestAnimationFrame(() => this.loop());
 
-    const delta = Math.min(this.clock.getDelta(), 0.1);
-    const time = this.clock.getElapsedTime();
+    const now = performance.now();
+    const delta = Math.min((now - this.lastFrameTime) / 1000, 0.1);
+    this.lastFrameTime = now;
 
     if (this.state === GAME_STATE.PLAYING) {
+      this.gameTotalTime += delta;
       this.elapsedTime += delta;
-      this.updateGame(delta, time);
+      this.updateGame(delta, this.gameTotalTime);
     } else if (this.state === GAME_STATE.JUMPSCARE) {
       // Jumpscare animation handles itself
     }
