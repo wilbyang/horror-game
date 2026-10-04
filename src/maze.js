@@ -118,54 +118,104 @@ export class Maze {
 
   findKeyLocations(midOdd) {
     const s = this.size;
-    const candidatesQ1 = []; // Top-Left: z < mid, x < mid
-    const candidatesQ2 = []; // Top-Right: z < mid, x >= mid
-    const candidatesQ3 = []; // Bottom: z >= mid
 
-    for (let z = 1; z < s - 1; z++) {
-      for (let x = 1; x < s - 1; x++) {
-        if (this.grid[z][x] === 0) {
-          // Distance from spawn
-          const distFromSpawn = Math.hypot(x - midOdd, z - midOdd);
-          if (distFromSpawn > 3) {
-            // Count wall neighbors
-            let wallCount = 0;
-            if (this.grid[z - 1][x] === 1) wallCount++;
-            if (this.grid[z + 1][x] === 1) wallCount++;
-            if (this.grid[z][x - 1] === 1) wallCount++;
-            if (this.grid[z][x + 1] === 1) wallCount++;
+    if (this.worldLevel === 2) {
+      // 5 Keys for World 2: Top-Left, Top-Right, Bottom-Left, Bottom-Right, and Far Lateral/Perimeter
+      const candTL = [];
+      const candTR = [];
+      const candBL = [];
+      const candBR = [];
+      const allWalkable = [];
 
-            // Prefer dead-ends or alcoves
-            const score = distFromSpawn + (wallCount >= 3 ? 10 : 0);
+      for (let z = 1; z < s - 1; z++) {
+        for (let x = 1; x < s - 1; x++) {
+          if (this.grid[z][x] === 0) {
+            const distFromSpawn = Math.hypot(x - midOdd, z - midOdd);
+            if (distFromSpawn > 3) {
+              let wallCount = 0;
+              if (this.grid[z - 1][x] === 1) wallCount++;
+              if (this.grid[z + 1][x] === 1) wallCount++;
+              if (this.grid[z][x - 1] === 1) wallCount++;
+              if (this.grid[z][x + 1] === 1) wallCount++;
 
-            if (z < midOdd && x < midOdd) {
-              candidatesQ1.push({ x, z, score });
-            } else if (z < midOdd && x >= midOdd) {
-              candidatesQ2.push({ x, z, score });
-            } else if (z >= midOdd && (x !== midOdd || z < s - 3)) {
-              candidatesQ3.push({ x, z, score });
+              const score = distFromSpawn + (wallCount >= 3 ? 12 : (wallCount >= 2 ? 6 : 0));
+              const cand = { x, z, score };
+              allWalkable.push(cand);
+
+              if (z < midOdd && x < midOdd) candTL.push(cand);
+              else if (z < midOdd && x >= midOdd) candTR.push(cand);
+              else if (z >= midOdd && x < midOdd && (x !== midOdd || z < s - 3)) candBL.push(cand);
+              else if (z >= midOdd && x >= midOdd && (x !== midOdd || z < s - 3)) candBR.push(cand);
             }
           }
         }
       }
-    }
 
-    // Sort by highest score (deepest in maze)
-    candidatesQ1.sort((a, b) => b.score - a.score);
-    candidatesQ2.sort((a, b) => b.score - a.score);
-    candidatesQ3.sort((a, b) => b.score - a.score);
+      candTL.sort((a, b) => b.score - a.score);
+      candTR.sort((a, b) => b.score - a.score);
+      candBL.sort((a, b) => b.score - a.score);
+      candBR.sort((a, b) => b.score - a.score);
 
-    const k1 = candidatesQ1[0] || { x: 1, z: 1 };
-    const k2 = candidatesQ2[0] || { x: s - 2, z: 1 };
-    const k3 = candidatesQ3[0] || { x: s - 2, z: s - 2 };
+      const k1 = candTL[0] || { x: 1, z: 1 };
+      const k2 = candTR[0] || { x: s - 2, z: 1 };
+      const k3 = candBL[0] || { x: 1, z: s - 2 };
+      const k4 = candBR[0] || { x: s - 2, z: s - 2 };
 
-    if (this.worldLevel === 2) {
+      // Find 5th key location: furthest candidate from the first 4 keys
+      const chosenFirstFour = [k1, k2, k3, k4];
+      allWalkable.sort((a, b) => {
+        const minDistA = Math.min(...chosenFirstFour.map(k => Math.hypot(a.x - k.x, a.z - k.z)));
+        const minDistB = Math.min(...chosenFirstFour.map(k => Math.hypot(b.x - k.x, b.z - k.z)));
+        return (minDistB * 2 + b.score) - (minDistA * 2 + a.score);
+      });
+      const k5 = allWalkable[0] || candTL[1] || { x: midOdd, z: 1 };
+
       this.keyPositions = [
         { id: 'amethyst', name: 'Void Amethyst Key', color: 0xa855f7, pos: this.gridToWorld(k1.x, k1.z), grid: k1 },
         { id: 'emerald', name: 'Soul Emerald Key', color: 0x10b981, pos: this.gridToWorld(k2.x, k2.z), grid: k2 },
-        { id: 'crimson', name: 'Abyssal Eye Key', color: 0xf43f5e, pos: this.gridToWorld(k3.x, k3.z), grid: k3 }
+        { id: 'crimson', name: 'Abyssal Eye Key', color: 0xf43f5e, pos: this.gridToWorld(k3.x, k3.z), grid: k3 },
+        { id: 'infernal', name: 'Infernal Core Key', color: 0xf97316, pos: this.gridToWorld(k4.x, k4.z), grid: k4 },
+        { id: 'azure', name: 'Nether Azure Key', color: 0x06b6d4, pos: this.gridToWorld(k5.x, k5.z), grid: k5 }
       ];
     } else {
+      // 3 Keys for World 1
+      const candidatesQ1 = [];
+      const candidatesQ2 = [];
+      const candidatesQ3 = [];
+
+      for (let z = 1; z < s - 1; z++) {
+        for (let x = 1; x < s - 1; x++) {
+          if (this.grid[z][x] === 0) {
+            const distFromSpawn = Math.hypot(x - midOdd, z - midOdd);
+            if (distFromSpawn > 3) {
+              let wallCount = 0;
+              if (this.grid[z - 1][x] === 1) wallCount++;
+              if (this.grid[z + 1][x] === 1) wallCount++;
+              if (this.grid[z][x - 1] === 1) wallCount++;
+              if (this.grid[z][x + 1] === 1) wallCount++;
+
+              const score = distFromSpawn + (wallCount >= 3 ? 10 : 0);
+
+              if (z < midOdd && x < midOdd) {
+                candidatesQ1.push({ x, z, score });
+              } else if (z < midOdd && x >= midOdd) {
+                candidatesQ2.push({ x, z, score });
+              } else if (z >= midOdd && (x !== midOdd || z < s - 3)) {
+                candidatesQ3.push({ x, z, score });
+              }
+            }
+          }
+        }
+      }
+
+      candidatesQ1.sort((a, b) => b.score - a.score);
+      candidatesQ2.sort((a, b) => b.score - a.score);
+      candidatesQ3.sort((a, b) => b.score - a.score);
+
+      const k1 = candidatesQ1[0] || { x: 1, z: 1 };
+      const k2 = candidatesQ2[0] || { x: s - 2, z: 1 };
+      const k3 = candidatesQ3[0] || { x: s - 2, z: s - 2 };
+
       this.keyPositions = [
         { id: 'ruby', name: 'Blood Ruby Key', color: 0xef4444, pos: this.gridToWorld(k1.x, k1.z), grid: k1 },
         { id: 'sapphire', name: 'Void Sapphire Key', color: 0x3b82f6, pos: this.gridToWorld(k2.x, k2.z), grid: k2 },

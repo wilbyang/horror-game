@@ -211,6 +211,7 @@ class Game {
     this.ui.hideJumpscareOverlay();
     this.collectedKeys = {};
     this.keysCount = 0;
+    this.totalKeys = (this.currentWorld === 2) ? 5 : 3;
     this.ui.setWorld(this.currentWorld);
     this.ui.updateKeys(this.collectedKeys);
 
@@ -236,7 +237,7 @@ class Game {
     this.exitGate = new ExitGate(this.maze.exitPos, this.currentWorld);
     this.scene.add(this.exitGate.group);
 
-    // Spawn 3 Keys
+    // Spawn Keys (3 for World 1, 5 for World 2)
     this.keys = this.maze.keyPositions.map(info => {
       const keyItem = new KeyItem(info);
       this.scene.add(keyItem.group);
@@ -292,7 +293,7 @@ class Game {
     this.ui.showHUD();
 
     if (this.currentWorld === 2) {
-      this.ui.notify('WORLD 2: Recover 3 Abyssal Relics to escape through the Void Portal. TWO Stalkers are hunting you!', 5500);
+      this.ui.notify('WORLD 2: Recover all 5 Abyssal Relics to escape through the Void Portal. TWO Stalkers are hunting you!', 5500);
     } else {
       this.ui.notify('Find 3 Ancient Keys to unlock the South Exit Gate...', 4000);
     }
@@ -499,18 +500,18 @@ class Game {
           this.ui.updateKeys(this.collectedKeys);
           this.exitGate.insertKey(key.id);
 
-          this.ui.notify(`Acquired ${key.name} (${this.keysCount}/3)!`);
+          this.ui.notify(`Acquired ${key.name} (${this.keysCount}/${this.totalKeys})!`);
 
           // All monsters hear the key pickup disturbance!
           this.monsters.forEach(m => m.hearNoise(playerPos));
 
           // All keys collected!
-          if (this.keysCount === 3) {
+          if (this.keysCount === this.totalKeys) {
             setTimeout(() => {
               this.sound.playGateUnlocked();
               this.exitGate.unlock();
               const unlockMsg = (this.currentWorld === 2)
-                ? 'ALL 3 ABYSSAL RELICS ACQUIRED! THE VOID PORTAL IS ACTIVE! ESCAPE!'
+                ? 'ALL 5 ABYSSAL RELICS ACQUIRED! THE VOID PORTAL IS ACTIVE! ESCAPE!'
                 : 'ALL 3 KEYS ACQUIRED! THE SOUTH EXIT GATE IS UNLOCKED! ESCAPE!';
               this.ui.notify(unlockMsg, 6000);
             }, 800);
@@ -641,7 +642,7 @@ class Game {
     if (progress >= 1.0) {
       this.state = GAME_STATE.GAMEOVER;
       this.ui.hideJumpscareOverlay();
-      this.ui.showGameOver(this.elapsedTime, this.keysCount, this.currentWorld);
+      this.ui.showGameOver(this.elapsedTime, this.keysCount, this.totalKeys, this.currentWorld);
     }
   }
 
@@ -656,9 +657,9 @@ class Game {
         localStorage.setItem('horror_world2_unlocked', 'true');
       } catch (e) {}
       this.ui.updateWorldUnlockState(true);
-      this.ui.showVictory(this.elapsedTime, 1);
+      this.ui.showVictory(this.elapsedTime, 3, 1);
     } else {
-      this.ui.showVictory(this.elapsedTime, 2);
+      this.ui.showVictory(this.elapsedTime, 5, 2);
     }
   }
 }

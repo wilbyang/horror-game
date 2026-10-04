@@ -185,9 +185,10 @@ export class ExitGate {
     this.gateDoor.position.set(0, (WALL_HEIGHT - 0.6) / 2, 0);
     this.group.add(this.gateDoor);
 
-    // Altar pedestal with 3 Key Receptacles in front of the gate
+    // Altar pedestal with Key Receptacles in front of the gate
+    const altarWidth = (this.worldLevel === 2) ? 3.2 : 2.4;
     const altar = new THREE.Mesh(
-      new THREE.BoxGeometry(2.4, 0.9, 0.5),
+      new THREE.BoxGeometry(altarWidth, 0.9, 0.5),
       new THREE.MeshStandardMaterial({
         color: (this.worldLevel === 2) ? 0x180510 : 0x181824,
         roughness: 0.8
@@ -196,11 +197,13 @@ export class ExitGate {
     altar.position.set(0, 0.45, 1.2);
     this.group.add(altar);
 
-    // 3 Socket gems
+    // Socket gems (3 for World 1, 5 for World 2)
     const sockets = (this.worldLevel === 2) ? [
-      { id: 'amethyst', x: -0.7, color: 0xa855f7 },
-      { id: 'emerald', x: 0, color: 0x10b981 },
-      { id: 'crimson', x: 0.7, color: 0xf43f5e }
+      { id: 'amethyst', x: -1.0, color: 0xa855f7 },
+      { id: 'emerald', x: -0.5, color: 0x10b981 },
+      { id: 'crimson', x: 0, color: 0xf43f5e },
+      { id: 'infernal', x: 0.5, color: 0xf97316 },
+      { id: 'azure', x: 1.0, color: 0x06b6d4 }
     ] : [
       { id: 'ruby', x: -0.7, color: 0xef4444 },
       { id: 'sapphire', x: 0, color: 0x3b82f6 },

@@ -16,12 +16,16 @@ export class UIController {
     this.keySlots = [
       document.getElementById('slot-key-0'),
       document.getElementById('slot-key-1'),
-      document.getElementById('slot-key-2')
+      document.getElementById('slot-key-2'),
+      document.getElementById('slot-key-3'),
+      document.getElementById('slot-key-4')
     ];
     this.keyLabels = [
       document.getElementById('slot-key-label-0'),
       document.getElementById('slot-key-label-1'),
-      document.getElementById('slot-key-label-2')
+      document.getElementById('slot-key-label-2'),
+      document.getElementById('slot-key-label-3'),
+      document.getElementById('slot-key-label-4')
     ];
     this.keyIds = ['ruby', 'sapphire', 'topaz'];
 
@@ -142,17 +146,19 @@ export class UIController {
 
     if (worldLevel === 2) {
       if (this.titleMainHeader) this.titleMainHeader.textContent = 'THE ABYSSAL CRYPT';
-      if (this.titleSubHeader) this.titleSubHeader.textContent = 'LAIR OF THE ABYSSAL STALKER';
+      if (this.titleSubHeader) this.titleSubHeader.textContent = 'LAIR OF THE ABYSSAL STALKERS';
       if (this.titleStoryCard) {
         this.titleStoryCard.innerHTML = `
           You have breached the iron gate and descended into the abyssal underworld.<br>
           Obsidian fissures glow with molten lava, and blood-mist fills the chambers.<br><br>
-          <strong>OBJECTIVE:</strong> Recover <strong>3 Abyssal Relics</strong> and find the <strong>Void Portal</strong>.<br>
+          <strong>OBJECTIVE:</strong> Recover all <strong>5 Abyssal Relics</strong> and find the <strong>Void Portal</strong>.<br>
           <strong style="color:#f43f5e;">THREAT:</strong> <em>TWO Abyssal Stalkers</em> hunt in tandem—both are <em>FASTER THAN YOUR NORMAL WALK SPEED</em> and highly resistant to light stuns!
           <div class="key-objective-preview" id="key-preview-container">
             <div class="key-preview-item" style="color:#c084fc;">◆ Void Amethyst</div>
             <div class="key-preview-item" style="color:#34d399;">◆ Soul Emerald</div>
             <div class="key-preview-item" style="color:#fb7185;">◆ Abyssal Eye</div>
+            <div class="key-preview-item" style="color:#fb923c;">◆ Infernal Core</div>
+            <div class="key-preview-item" style="color:#38bdf8;">◆ Nether Azure</div>
           </div>
         `;
       }
@@ -195,7 +201,13 @@ export class UIController {
       if (this.keyLabels[0]) this.keyLabels[0].textContent = 'AMETHYST';
       if (this.keyLabels[1]) this.keyLabels[1].textContent = 'EMERALD';
       if (this.keyLabels[2]) this.keyLabels[2].textContent = 'CRIMSON';
-      this.keyIds = ['amethyst', 'emerald', 'crimson'];
+      if (this.keyLabels[3]) this.keyLabels[3].textContent = 'INFERNAL';
+      if (this.keyLabels[4]) this.keyLabels[4].textContent = 'AZURE';
+
+      for (let i = 0; i < 5; i++) {
+        if (this.keySlots[i]) this.keySlots[i].style.display = 'flex';
+      }
+      this.keyIds = ['amethyst', 'emerald', 'crimson', 'infernal', 'azure'];
     } else {
       if (this.worldBadge) {
         this.worldBadge.textContent = 'WORLD 1: LABYRINTH';
@@ -204,6 +216,13 @@ export class UIController {
       if (this.keyLabels[0]) this.keyLabels[0].textContent = 'RUBY';
       if (this.keyLabels[1]) this.keyLabels[1].textContent = 'SAPPHIRE';
       if (this.keyLabels[2]) this.keyLabels[2].textContent = 'TOPAZ';
+
+      if (this.keySlots[0]) this.keySlots[0].style.display = 'flex';
+      if (this.keySlots[1]) this.keySlots[1].style.display = 'flex';
+      if (this.keySlots[2]) this.keySlots[2].style.display = 'flex';
+      if (this.keySlots[3]) this.keySlots[3].style.display = 'none';
+      if (this.keySlots[4]) this.keySlots[4].style.display = 'none';
+
       this.keyIds = ['ruby', 'sapphire', 'topaz'];
     }
   }
@@ -232,13 +251,13 @@ export class UIController {
     this.pauseScreen.style.display = 'none';
   }
 
-  showGameOver(timeSurvived, keysFound, worldLevel = 1) {
+  showGameOver(timeSurvived, keysFound, totalKeys = 3, worldLevel = 1) {
     this.hideHUD();
     this.statsTimeDead.textContent = this.formatTime(timeSurvived);
-    this.statsKeysDead.textContent = `${keysFound} / 3`;
+    this.statsKeysDead.textContent = `${keysFound} / ${totalKeys}`;
     if (this.deathReason) {
       if (worldLevel === 2) {
-        this.deathReason.textContent = 'THE ABYSSAL STALKER SHREDDED YOUR SOUL';
+        this.deathReason.textContent = 'THE ABYSSAL STALKERS SHREDDED YOUR SOUL';
       } else {
         this.deathReason.textContent = 'THE DREAD WALKER CONSUMED YOUR SOUL';
       }
@@ -246,9 +265,11 @@ export class UIController {
     this.gameoverScreen.style.display = 'flex';
   }
 
-  showVictory(timeElapsed, worldLevel = 1) {
+  showVictory(timeElapsed, totalKeys = 3, worldLevel = 1) {
     this.hideHUD();
     this.statsTimeWin.textContent = this.formatTime(timeElapsed);
+    const winKeysEl = document.getElementById('stats-keys-win');
+    if (winKeysEl) winKeysEl.textContent = `${totalKeys} / ${totalKeys}`;
 
     let rating = 'S RANK';
     if (timeElapsed > 240) rating = 'B RANK';
@@ -277,7 +298,7 @@ export class UIController {
         this.victoryTitle.style.textShadow = '0 0 45px #a855f7';
       }
       if (this.victorySubtitle) {
-        this.victorySubtitle.innerHTML = 'YOU DEFEATED THE ABYSSAL STALKER AND ESCAPED THE VOID!<br><span style="color:#34d399;font-weight:bold;letter-spacing:2px;display:inline-block;margin-top:6px;">MASTER SURVIVOR: COMPLETED BOTH WORLDS</span>';
+        this.victorySubtitle.innerHTML = 'YOU DEFEATED THE ABYSSAL STALKERS AND ESCAPED THE VOID!<br><span style="color:#34d399;font-weight:bold;letter-spacing:2px;display:inline-block;margin-top:6px;">MASTER SURVIVOR: COMPLETED BOTH WORLDS</span>';
       }
       if (this.btnEnterWorld2) {
         this.btnEnterWorld2.style.display = 'none';
