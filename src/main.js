@@ -76,7 +76,8 @@ class Game {
 
     // World objects
     this.maze = null;
-    this.monster = null;
+    this.monsters = [];
+    this.killerMonster = null;
     this.keys = [];
     this.exitGate = null;
 
@@ -199,7 +200,9 @@ class Game {
 
     // Clear previous game entities from scene if any
     if (this.maze) this.scene.remove(this.maze.group);
-    if (this.monster) this.scene.remove(this.monster.group);
+    if (this.monsters) this.monsters.forEach(m => this.scene.remove(m.group));
+    this.monsters = [];
+    this.killerMonster = null;
     if (this.exitGate) this.scene.remove(this.exitGate.group);
     this.keys.forEach(k => this.scene.remove(k.group));
     this.keys = [];
@@ -243,35 +246,42 @@ class Game {
     // Position Player at Spawn Safe Room
     this.player.resetPosition(this.maze.spawnPos);
 
-    // Spawn Monster
-    this.monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
-    this.spawnMonsterFarAway();
+    // Spawn Monsters: World 1 has 1 Dread Walker; World 2 has 2 Abyssal Stalkers!
+    const monsterCount = (this.currentWorld === 2) ? 2 : 1;
+    this.monsters = [];
 
-    // Adjust monster difficulty
-    if (this.currentWorld === 2) {
-      // World 2: Abyssal Stalker is aggressive and faster than player's 4.4 walkSpeed!
-      if (this.ui.selectedDifficulty === 'easy') {
-        this.monster.patrolSpeed = 2.2;
-        this.monster.chaseSpeed = 4.45;
-      } else if (this.ui.selectedDifficulty === 'hard') {
-        this.monster.patrolSpeed = 2.8;
-        this.monster.chaseSpeed = 5.2;
+    for (let i = 0; i < monsterCount; i++) {
+      const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
+
+      // Adjust monster difficulty
+      if (this.currentWorld === 2) {
+        // World 2: Abyssal Stalker is aggressive and faster than player's 4.4 walkSpeed!
+        if (this.ui.selectedDifficulty === 'easy') {
+          monster.patrolSpeed = 2.2;
+          monster.chaseSpeed = 4.45;
+        } else if (this.ui.selectedDifficulty === 'hard') {
+          monster.patrolSpeed = 2.8;
+          monster.chaseSpeed = 5.2;
+        } else {
+          monster.patrolSpeed = 2.5;
+          monster.chaseSpeed = 4.75;
+        }
       } else {
-        this.monster.patrolSpeed = 2.5;
-        this.monster.chaseSpeed = 4.75;
+        // World 1: Dread Walker is slower than player's 4.4 walkSpeed
+        if (this.ui.selectedDifficulty === 'easy') {
+          monster.patrolSpeed = 1.6;
+          monster.chaseSpeed = 3.1;
+        } else if (this.ui.selectedDifficulty === 'hard') {
+          monster.patrolSpeed = 2.1;
+          monster.chaseSpeed = 3.9;
+        } else {
+          monster.patrolSpeed = 1.9;
+          monster.chaseSpeed = 3.6;
+        }
       }
-    } else {
-      // World 1: Dread Walker is slower than player's 4.4 walkSpeed
-      if (this.ui.selectedDifficulty === 'easy') {
-        this.monster.patrolSpeed = 1.6;
-        this.monster.chaseSpeed = 3.1;
-      } else if (this.ui.selectedDifficulty === 'hard') {
-        this.monster.patrolSpeed = 2.1;
-        this.monster.chaseSpeed = 3.9;
-      } else {
-        this.monster.patrolSpeed = 1.9;
-        this.monster.chaseSpeed = 3.6;
-      }
+
+      this.monsters.push(monster);
+      this.spawnMonsterFarAway(monster);
     }
 
     // Hide modals and show HUD
@@ -282,7 +292,7 @@ class Game {
     this.ui.showHUD();
 
     if (this.currentWorld === 2) {
-      this.ui.notify('WORLD 2: Recover 3 Abyssal Relics to escape through the Void Portal. SPRINT to survive!', 5000);
+      this.ui.notify('WORLD 2: Recover 3 Abyssal Relics to escape through the Void Portal. TWO Stalkers are hunting you!', 5500);
     } else {
       this.ui.notify('Find 3 Ancient Keys to unlock the South Exit Gate...', 4000);
     }
@@ -296,33 +306,44 @@ class Game {
     this.player.controls.lock();
   }
 
-  spawnMonsterFarAway() {
-    // Find an open walkable spot in the maze at least 35 units from player spawn
+  spawnMonsterFarAway(monster) {
+    // Find an open walkable spot in the maze distant from player spawn and any already-spawned monster
     let bestDist = 0;
     let bestPos = new THREE.Vector3();
 
-    for (let attempts = 0; attempts < 50; attempts++) {
+    for (let attempts = 0; attempts < 60; attempts++) {
       const gx = 1 + Math.floor(Math.random() * (this.maze.size - 2));
       const gz = 1 + Math.floor(Math.random() * (this.maze.size - 2));
 
       if (this.maze.isWalkable(gx, gz)) {
         const wPos = this.maze.gridToWorld(gx, gz);
-        const dist = wPos.distanceTo(this.maze.spawnPos);
-        if (dist > bestDist) {
-          bestDist = dist;
+        const distToSpawn = wPos.distanceTo(this.maze.spawnPos);
+
+        let distToOtherMonsters = 999;
+        for (const other of this.monsters) {
+          if (other !== monster && other.group.position.lengthSq() > 0.1) {
+            const d = wPos.distanceTo(other.group.position);
+            if (d < distToOtherMonsters) distToOtherMonsters = d;
+          }
+        }
+
+        const score = distToSpawn + Math.min(distToOtherMonsters, 30);
+        if (score > bestDist) {
+          bestDist = score;
           bestPos.copy(wPos);
         }
       }
     }
-    this.monster.spawn(bestPos);
+    monster.spawn(bestPos);
   }
 
   triggerSonarPulse() {
+    const monsterPositions = this.monsters.map(m => m.group.position);
     const success = this.ui.triggerSonar(
       this.maze,
       this.player.camera.position,
       this.getPlayerYaw(),
-      this.monster.group.position,
+      monsterPositions,
       this.keys
     );
     if (success) {
@@ -376,28 +397,50 @@ class Game {
     this.exitGate.update(delta, time);
     this.checkExitCollision(playerPos);
 
-    // Check if player is shining flashlight directly at monster
-    const isLightingMonster = this.player.isLightingObject(this.monster.group.position);
+    // Update all Monsters
     const playerNoise = this.player.getNoiseLevel();
+    let nearestMonsterDist = Infinity;
+    let anyMonsterChasing = false;
+    let anyMonsterInvestigating = false;
+    let caughtByMonster = null;
 
-    // Update Monster AI with camera for spatial 3D audio
-    this.monster.update(delta, playerPos, playerNoise, isLightingMonster, this.camera);
+    for (const monster of this.monsters) {
+      // Check if player is shining flashlight directly at this monster
+      const isLighting = this.player.isLightingObject(monster.group.position);
 
-    // Flat horizontal distance to monster in maze
-    const monsterDist = Math.hypot(
-      this.monster.group.position.x - playerPos.x,
-      this.monster.group.position.z - playerPos.z
-    );
-    const isChasing = (this.monster.state === MONSTER_STATE.CHASE);
+      // Update Monster AI with camera for spatial 3D audio
+      monster.update(delta, playerPos, playerNoise, isLighting, this.camera);
+
+      // Flat horizontal distance to monster in maze
+      const dist = Math.hypot(
+        monster.group.position.x - playerPos.x,
+        monster.group.position.z - playerPos.z
+      );
+
+      if (dist < nearestMonsterDist) {
+        nearestMonsterDist = dist;
+      }
+      if (monster.state === MONSTER_STATE.CHASE) {
+        anyMonsterChasing = true;
+      }
+      if (monster.state === MONSTER_STATE.INVESTIGATE) {
+        anyMonsterInvestigating = true;
+      }
+
+      // Catch / Jumpscare check: Monster caught player!
+      if (dist < 1.95 && !caughtByMonster) {
+        caughtByMonster = monster;
+      }
+    }
 
     // Subtle physical ground rumble when heavy monster is stomping nearby
-    if (monsterDist < 12 && (isChasing || this.monster.state === MONSTER_STATE.INVESTIGATE)) {
-      const rumble = (1 - monsterDist / 12) * 0.016;
+    if (nearestMonsterDist < 12 && (anyMonsterChasing || anyMonsterInvestigating)) {
+      const rumble = (1 - nearestMonsterDist / 12) * 0.016;
       this.camera.position.y += (Math.random() - 0.5) * rumble;
     }
 
-    // Update Threat & Heartbeat
-    const threat = this.ui.updateThreat(monsterDist, isChasing);
+    // Update Threat & Heartbeat based on nearest monster
+    const threat = this.ui.updateThreat(nearestMonsterDist, anyMonsterChasing);
     this.sound.setThreatLevel(threat);
 
     // Update UI HUD
@@ -409,20 +452,20 @@ class Game {
     // Update Compass with directional key markers & exit marker
     this.ui.updateCompass(this.getPlayerYaw(), playerPos, this.keys, this.exitGate);
 
-    // Update Sonar Radar
+    // Update Sonar Radar with all monster positions
+    const monsterPositions = this.monsters.map(m => m.group.position);
     this.ui.updateSonar(
       delta,
       this.maze,
       playerPos,
       this.getPlayerYaw(),
-      this.monster.group.position,
+      monsterPositions,
       this.keys
     );
 
-    // Catch / Jumpscare check: Monster caught player!
-    // Player radius (0.5) + Monster radius (0.65) + Claw strike reach (0.8) = 1.95m
-    if (monsterDist < 1.95) {
-      this.triggerGameOverCatch();
+    // Catch / Jumpscare check
+    if (caughtByMonster) {
+      this.triggerGameOverCatch(caughtByMonster);
     }
   }
 
@@ -458,8 +501,8 @@ class Game {
 
           this.ui.notify(`Acquired ${key.name} (${this.keysCount}/3)!`);
 
-          // Monster hears the key pickup disturbance!
-          this.monster.hearNoise(playerPos);
+          // All monsters hear the key pickup disturbance!
+          this.monsters.forEach(m => m.hearNoise(playerPos));
 
           // All keys collected!
           if (this.keysCount === 3) {
@@ -502,10 +545,13 @@ class Game {
     }
   }
 
-  triggerGameOverCatch() {
+  triggerGameOverCatch(killerMonster = null) {
     this.state = GAME_STATE.JUMPSCARE;
     this.player.controls.unlock();
     this.sound.playJumpscare();
+
+    this.killerMonster = killerMonster || this.monsters[0];
+    const monster = this.killerMonster;
 
     this.jumpscareStartTime = performance.now();
     this.jumpscareDuration = 2.8; // seconds
@@ -513,7 +559,7 @@ class Game {
     this.jumpscareCamBaseY = this.camera.position.y;
 
     // Place monster immediately 1.15m in front of the camera, directly facing player
-    const monsterDir = new THREE.Vector3().subVectors(this.monster.group.position, this.camera.position);
+    const monsterDir = new THREE.Vector3().subVectors(monster.group.position, this.camera.position);
     monsterDir.y = 0;
     if (monsterDir.length() < 0.2) {
       this.camera.getWorldDirection(monsterDir);
@@ -521,16 +567,16 @@ class Game {
     }
     monsterDir.normalize();
 
-    this.monster.group.position.copy(this.camera.position).addScaledVector(monsterDir, 1.15);
-    this.monster.group.position.y = 0;
+    monster.group.position.copy(this.camera.position).addScaledVector(monsterDir, 1.15);
+    monster.group.position.y = 0;
 
     // Face monster directly towards camera
-    this.monster.group.rotation.y = Math.atan2(-monsterDir.x, -monsterDir.z);
+    monster.group.rotation.y = Math.atan2(-monsterDir.x, -monsterDir.z);
 
     // Lock camera directly on monster head
-    this.monster.group.updateMatrixWorld(true);
+    monster.group.updateMatrixWorld(true);
     const headPos = new THREE.Vector3();
-    this.monster.head.getWorldPosition(headPos);
+    monster.head.getWorldPosition(headPos);
     this.camera.lookAt(headPos);
 
     this.ui.hideHUD();
@@ -540,16 +586,17 @@ class Game {
   updateJumpscareSequence(delta) {
     const elapsed = (performance.now() - this.jumpscareStartTime) / 1000;
     const progress = Math.min(1.0, elapsed / this.jumpscareDuration);
+    const monster = this.killerMonster || this.monsters[0];
 
     // 1. Monster lunges into the camera lens with unhinged jaws and reaching claws
-    this.monster.animateJumpscareLunge(progress, this.camera.position);
+    monster.animateJumpscareLunge(progress, this.camera.position);
 
     // Monster moves right up in front of the camera (head distance ~0.6m)
-    const toCam = new THREE.Vector3().subVectors(this.camera.position, this.monster.group.position);
+    const toCam = new THREE.Vector3().subVectors(this.camera.position, monster.group.position);
     toCam.y = 0;
     if (toCam.length() > 0.85) {
       toCam.normalize();
-      this.monster.group.position.addScaledVector(toCam, delta * 3.5);
+      monster.group.position.addScaledVector(toCam, delta * 3.5);
     }
 
     // Violent screen trauma vibration
@@ -569,9 +616,9 @@ class Game {
     }
 
     // Camera locks directly on monster's terrifying gaping head & glowing eyes
-    this.monster.group.updateMatrixWorld(true);
+    monster.group.updateMatrixWorld(true);
     const headWorldPos = new THREE.Vector3();
-    this.monster.head.getWorldPosition(headWorldPos);
+    monster.head.getWorldPosition(headWorldPos);
     this.camera.lookAt(headWorldPos);
     if (rollTilt !== 0) {
       this.camera.rotation.z += rollTilt;

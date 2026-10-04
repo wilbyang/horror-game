@@ -148,7 +148,7 @@ export class UIController {
           You have breached the iron gate and descended into the abyssal underworld.<br>
           Obsidian fissures glow with molten lava, and blood-mist fills the chambers.<br><br>
           <strong>OBJECTIVE:</strong> Recover <strong>3 Abyssal Relics</strong> and find the <strong>Void Portal</strong>.<br>
-          <strong style="color:#f43f5e;">THREAT:</strong> The Abyssal Stalker is <em>FASTER THAN YOUR NORMAL WALK SPEED</em> and highly resistant to light stuns!
+          <strong style="color:#f43f5e;">THREAT:</strong> <em>TWO Abyssal Stalkers</em> hunt in tandem—both are <em>FASTER THAN YOUR NORMAL WALK SPEED</em> and highly resistant to light stuns!
           <div class="key-objective-preview" id="key-preview-container">
             <div class="key-preview-item" style="color:#c084fc;">◆ Void Amethyst</div>
             <div class="key-preview-item" style="color:#34d399;">◆ Soul Emerald</div>
@@ -418,7 +418,7 @@ export class UIController {
   }
 
   // Trigger Echolocation Pulse
-  triggerSonar(maze, playerPos, playerYaw, monsterPos, keys) {
+  triggerSonar(maze, playerPos, playerYaw, monsterPositions, keys) {
     if (this.sonarCooldown > 0) return false;
 
     this.sonarActive = true;
@@ -428,7 +428,7 @@ export class UIController {
     return true;
   }
 
-  updateSonar(delta, maze, playerPos, playerYaw, monsterPos, keys) {
+  updateSonar(delta, maze, playerPos, playerYaw, monsterPositions, keys) {
     if (this.sonarCooldown > 0) {
       this.sonarCooldown -= delta;
     }
@@ -509,23 +509,30 @@ export class UIController {
     ctx.lineTo(cx + Math.sin(playerYaw) * 16, cy - Math.cos(playerYaw) * 16);
     ctx.stroke();
 
-    // Draw Monster ping
-    const mDx = (monsterPos.x - playerPos.x) / 4.0;
-    const mDz = (monsterPos.z - playerPos.z) / 4.0;
-    const mx = cx + mDx * scale;
-    const my = cy + mDz * scale;
-    const mDist = Math.hypot(mx - cx, my - cy);
+    // Draw Monster ping(s)
+    const mPositions = Array.isArray(monsterPositions)
+      ? monsterPositions
+      : (monsterPositions ? [monsterPositions] : []);
 
-    if (mDist < 185) {
-      // Flashing red monster blip
-      ctx.fillStyle = '#ef4444';
-      ctx.shadowColor = '#ef4444';
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.arc(mx, my, 7, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    }
+    mPositions.forEach(mPos => {
+      if (!mPos) return;
+      const mDx = (mPos.x - playerPos.x) / 4.0;
+      const mDz = (mPos.z - playerPos.z) / 4.0;
+      const mx = cx + mDx * scale;
+      const my = cy + mDz * scale;
+      const mDist = Math.hypot(mx - cx, my - cy);
+
+      if (mDist < 185) {
+        // Flashing red monster blip
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(mx, my, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    });
 
     // Draw Keys on sonar
     keys.forEach(k => {
