@@ -164,16 +164,16 @@ export class UIController {
       threat = (38 - distance) / 38;
       if (distance < 12 || isChasing) {
         label = 'RUN!';
-        this.heartIcon.className = 'danger';
+        this.heartIcon.setAttribute('class', 'danger');
       } else if (distance < 22) {
         label = 'WARNING';
-        this.heartIcon.className = 'beating';
+        this.heartIcon.setAttribute('class', 'beating');
       } else {
         label = 'CAUTION';
-        this.heartIcon.className = 'beating';
+        this.heartIcon.setAttribute('class', 'beating');
       }
     } else {
-      this.heartIcon.className = '';
+      this.heartIcon.setAttribute('class', '');
     }
 
     this.threatText.textContent = label;
