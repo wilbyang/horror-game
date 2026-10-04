@@ -294,4 +294,149 @@ export class TextureGenerator {
     const texture = new THREE.CanvasTexture(canvas);
     return texture;
   }
+
+  static createMonsterSkinTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Base ashen necrotic skin
+    ctx.fillStyle = '#18141c';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Bruised undertones (purple and dark crimson blotches)
+    for (let i = 0; i < 24; i++) {
+      const bx = Math.random() * 512;
+      const by = Math.random() * 512;
+      const brad = 30 + Math.random() * 80;
+      const bGrad = ctx.createRadialGradient(bx, by, 5, bx, by, brad);
+      bGrad.addColorStop(0, Math.random() > 0.5 ? 'rgba(60, 15, 25, 0.45)' : 'rgba(30, 20, 45, 0.45)');
+      bGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = bGrad;
+      ctx.beginPath();
+      ctx.arc(bx, by, brad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Branching dark veins
+    ctx.lineWidth = 1.2;
+    for (let v = 0; v < 16; v++) {
+      let vx = Math.random() * 512;
+      let vy = Math.random() * 512;
+      ctx.strokeStyle = Math.random() > 0.5 ? 'rgba(70, 15, 20, 0.6)' : 'rgba(25, 30, 60, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(vx, vy);
+      for (let s = 0; s < 8; s++) {
+        vx += (Math.random() - 0.5) * 45;
+        vy += Math.random() * 35;
+        ctx.lineTo(vx, vy);
+      }
+      ctx.stroke();
+    }
+
+    // Raw muscle striations / scratches
+    ctx.strokeStyle = 'rgba(110, 15, 20, 0.4)';
+    ctx.lineWidth = 1;
+    for (let m = 0; m < 50; m++) {
+      const mx = Math.random() * 512;
+      const my = Math.random() * 512;
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      ctx.lineTo(mx + 15 + Math.random() * 25, my + (Math.random() - 0.5) * 10);
+      ctx.stroke();
+    }
+
+    // Leathery skin pore noise
+    for (let p = 0; p < 800; p++) {
+      const px = Math.random() * 512;
+      const py = Math.random() * 512;
+      const val = 18 + Math.floor(Math.random() * 20);
+      ctx.fillStyle = `rgb(${val}, ${val - 3}, ${val + 4})`;
+      ctx.fillRect(px, py, 2, 2);
+    }
+
+    // Glistening wet fresh blood streaks
+    ctx.fillStyle = 'rgba(130, 8, 12, 0.7)';
+    for (let g = 0; g < 12; g++) {
+      const gx = Math.random() * 512;
+      const gy = Math.random() * 512;
+      const glen = 15 + Math.random() * 45;
+      ctx.fillRect(gx, gy, 2 + Math.random() * 3, glen);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }
+
+  static createMonsterRoughnessTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Default matte dry skin (light grey = rough)
+    ctx.fillStyle = '#999999';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Wet blood & slime patches (dark grey/black = specular/shiny)
+    for (let i = 0; i < 35; i++) {
+      const wx = Math.random() * 512;
+      const wy = Math.random() * 512;
+      const wrad = 15 + Math.random() * 40;
+      const grad = ctx.createRadialGradient(wx, wy, 2, wx, wy, wrad);
+      grad.addColorStop(0, '#111111'); // Ultra shiny wet
+      grad.addColorStop(0.7, '#444444');
+      grad.addColorStop(1, '#999999');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(wx, wy, wrad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }
+
+  static createMonsterBoneTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Aged yellowed bone
+    ctx.fillStyle = '#6b6355';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Bone cracks & porous texture
+    for (let i = 0; i < 300; i++) {
+      const x = Math.random() * 256;
+      const y = Math.random() * 256;
+      ctx.fillStyle = (Math.random() > 0.5) ? '#4a4235' : '#857c6b';
+      ctx.fillRect(x, y, 2, 2);
+    }
+
+    // Blood stains on bone
+    for (let b = 0; b < 10; b++) {
+      const bx = Math.random() * 256;
+      const by = Math.random() * 256;
+      const brad = 10 + Math.random() * 30;
+      const bGrad = ctx.createRadialGradient(bx, by, 2, bx, by, brad);
+      bGrad.addColorStop(0, 'rgba(100, 10, 15, 0.7)');
+      bGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = bGrad;
+      ctx.beginPath();
+      ctx.arc(bx, by, brad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }
 }

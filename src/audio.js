@@ -405,43 +405,97 @@ export class SoundEngine {
     }
   }
 
-  // Jumpscare death sound
+  // Visceral Jumpscare Kill Sound
   playJumpscare() {
     if (!this.ctx || this.ctx.state !== 'running') return;
     const now = this.ctx.currentTime;
 
-    // Screaming dissonant chord
-    const freqs = [220, 233.08, 311.13, 440, 466.16, 622.25];
-    freqs.forEach(freq => {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.1);
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.3, now + 1.2);
+    // 1. Bone Crunch / Flesh Tear Transient
+    const crunchLen = Math.floor(this.ctx.sampleRate * 0.45);
+    const crunchBuf = this.ctx.createBuffer(1, crunchLen, this.ctx.sampleRate);
+    const cData = crunchBuf.getChannelData(0);
+    for (let i = 0; i < crunchLen; i++) {
+      cData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (crunchLen * 0.25));
+    }
+    const crunchSource = this.ctx.createBufferSource();
+    crunchSource.buffer = crunchBuf;
+    const crunchFilter = this.ctx.createBiquadFilter();
+    crunchFilter.type = 'lowpass';
+    crunchFilter.frequency.setValueAtTime(800, now);
+    crunchFilter.frequency.exponentialRampToValueAtTime(120, now + 0.35);
 
-      gain.gain.setValueAtTime(0.4, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+    const crunchGain = this.ctx.createGain();
+    crunchGain.gain.setValueAtTime(1.0, now);
+    crunchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
 
-      osc.connect(gain);
-      gain.connect(this.masterGain);
-      osc.start(now);
-      osc.stop(now + 1.4);
-    });
+    crunchSource.connect(crunchFilter);
+    crunchFilter.connect(crunchGain);
+    crunchGain.connect(this.masterGain);
+    crunchSource.start(now);
 
-    // Sub explosion
+    // 2. Ear-Piercing Eldritch Shriek (Dual chaotic sweep)
+    const scream1 = this.ctx.createOscillator();
+    const scream2 = this.ctx.createOscillator();
+    const screamGain = this.ctx.createGain();
+
+    scream1.type = 'sawtooth';
+    scream2.type = 'sawtooth';
+
+    scream1.frequency.setValueAtTime(450, now);
+    scream1.frequency.exponentialRampToValueAtTime(1600, now + 0.12);
+    scream1.frequency.exponentialRampToValueAtTime(280, now + 1.6);
+
+    scream2.frequency.setValueAtTime(470, now);
+    scream2.frequency.exponentialRampToValueAtTime(1580, now + 0.14);
+    scream2.frequency.exponentialRampToValueAtTime(270, now + 1.6);
+
+    const screamFilter = this.ctx.createBiquadFilter();
+    screamFilter.type = 'bandpass';
+    screamFilter.frequency.setValueAtTime(1100, now);
+    screamFilter.Q.setValueAtTime(5.0, now);
+
+    screamGain.gain.setValueAtTime(0.9, now);
+    screamGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+
+    scream1.connect(screamFilter);
+    scream2.connect(screamFilter);
+    screamFilter.connect(screamGain);
+    screamGain.connect(this.masterGain);
+
+    scream1.start(now);
+    scream2.start(now);
+    scream1.stop(now + 1.8);
+    scream2.stop(now + 1.8);
+
+    // 3. Heavy Sub-Bass Impact Slam
     const boom = this.ctx.createOscillator();
     const boomGain = this.ctx.createGain();
     boom.type = 'sine';
-    boom.frequency.setValueAtTime(110, now);
-    boom.frequency.exponentialRampToValueAtTime(25, now + 0.8);
-    boomGain.gain.setValueAtTime(1.0, now);
-    boomGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    boom.frequency.setValueAtTime(130, now);
+    boom.frequency.exponentialRampToValueAtTime(28, now + 0.85);
+    boomGain.gain.setValueAtTime(1.2, now);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
 
     boom.connect(boomGain);
     boomGain.connect(this.masterGain);
     boom.start(now);
-    boom.stop(now + 1.2);
+    boom.stop(now + 1.4);
+
+    // 4. Eerie Heart Flatline tone after kill
+    const flatline = this.ctx.createOscillator();
+    const flatlineGain = this.ctx.createGain();
+    flatline.type = 'sine';
+    flatline.frequency.setValueAtTime(880, now + 1.0);
+
+    flatlineGain.gain.setValueAtTime(0.001, now);
+    flatlineGain.gain.setValueAtTime(0.001, now + 0.95);
+    flatlineGain.gain.linearRampToValueAtTime(0.2, now + 1.1);
+    flatlineGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+
+    flatline.connect(flatlineGain);
+    flatlineGain.connect(this.masterGain);
+    flatline.start(now + 1.0);
+    flatline.stop(now + 3.0);
   }
 
   // Victory escape sound

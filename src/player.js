@@ -128,6 +128,7 @@ export class Player {
 
   resetPosition(spawnPos) {
     this.camera.position.set(spawnPos.x, this.height, spawnPos.z);
+    this.camera.rotation.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
     this.stamina = 100;
     this.isExhausted = false;

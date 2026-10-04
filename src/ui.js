@@ -315,91 +315,133 @@ export class UIController {
     });
   }
 
-  // Jumpscare Animation
-  playJumpscare(onComplete) {
+  // Jumpscare Gore Overlay
+  startJumpscareOverlay() {
     this.jumpscareOverlay.style.display = 'block';
     const canvas = this.jumpscareCanvas;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+
+    // Generate persistent arterial blood splatters for this kill
+    this.bloodSplatters = [];
+    const count = 28;
+    for (let i = 0; i < count; i++) {
+      this.bloodSplatters.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        maxRadius: 18 + Math.random() * 55,
+        dripLength: 30 + Math.random() * 120,
+        dripSpeed: 40 + Math.random() * 80,
+        dripWidth: 2 + Math.random() * 4,
+        appearTime: 0.15 + Math.random() * 0.45,
+        droplets: Array.from({ length: 4 }, () => ({
+          ox: (Math.random() - 0.5) * 40,
+          oy: (Math.random() - 0.5) * 40,
+          rad: 2 + Math.random() * 6
+        }))
+      });
+    }
+
+    // 3 Claw slash trajectories across camera lens
+    this.clawSlashes = [
+      { x1: canvas.width * 0.15, y1: canvas.height * 0.1, x2: canvas.width * 0.45, y2: canvas.height * 0.85 },
+      { x1: canvas.width * 0.25, y1: canvas.height * 0.05, x2: canvas.width * 0.55, y2: canvas.height * 0.9 },
+      { x1: canvas.width * 0.35, y1: canvas.height * 0.08, x2: canvas.width * 0.65, y2: canvas.height * 0.88 }
+    ];
+  }
+
+  renderJumpscareGore(progress) {
+    if (!this.jumpscareCtx) return;
     const ctx = this.jumpscareCtx;
+    const canvas = this.jumpscareCanvas;
+    const w = canvas.width;
+    const h = canvas.height;
 
-    let frame = 0;
-    const maxFrames = 75;
+    ctx.clearRect(0, 0, w, h);
 
-    const animate = () => {
-      frame++;
-      ctx.fillStyle = '#050204';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Initial shock flash & chromatic trauma
+    if (progress < 0.2) {
+      const flashAlpha = (1 - progress / 0.2) * 0.45;
+      ctx.fillStyle = `rgba(220, 10, 20, ${flashAlpha})`;
+      ctx.fillRect(0, 0, w, h);
+    }
 
-      const progress = frame / maxFrames;
-      const zoom = 0.5 + progress * 2.5;
+    // Claw slash gouges across lens
+    if (progress > 0.15) {
+      const slashProgress = Math.min(1.0, (progress - 0.15) / 0.25);
+      ctx.strokeStyle = 'rgba(180, 10, 15, 0.85)';
+      ctx.lineWidth = 4;
+      ctx.shadowColor = 'rgba(120, 0, 0, 0.9)';
+      ctx.shadowBlur = 10;
 
-      // Draw distorted screaming eldritch skull
-      ctx.save();
-      ctx.translate(canvas.width / 2 + (Math.random() - 0.5) * 40, canvas.height / 2 + (Math.random() - 0.5) * 40);
-      ctx.scale(zoom, zoom);
-
-      // Skull contour
-      ctx.fillStyle = '#1e1c1f';
-      ctx.beginPath();
-      ctx.ellipse(0, -20, 110, 150, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Sunken eye sockets
-      ctx.fillStyle = '#08080a';
-      ctx.beginPath();
-      ctx.ellipse(-45, -40, 32, 45, 0.1, 0, Math.PI * 2);
-      ctx.ellipse(45, -40, 32, 45, -0.1, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Glowing red pupils
-      ctx.fillStyle = '#ff0011';
-      ctx.shadowColor = '#ff0011';
-      ctx.shadowBlur = 25;
-      ctx.beginPath();
-      ctx.arc(-45, -40, 14, 0, Math.PI * 2);
-      ctx.arc(45, -40, 14, 0, Math.PI * 2);
-      ctx.fill();
+      for (const slash of this.clawSlashes) {
+        ctx.beginPath();
+        ctx.moveTo(slash.x1, slash.y1);
+        const currX = THREE.MathUtils.lerp(slash.x1, slash.x2, slashProgress);
+        const currY = THREE.MathUtils.lerp(slash.y1, slash.y2, slashProgress);
+        ctx.lineTo(currX, currY);
+        ctx.stroke();
+      }
       ctx.shadowBlur = 0;
+    }
 
-      // Gaping bloody maw
-      ctx.fillStyle = '#0a0204';
-      ctx.beginPath();
-      ctx.ellipse(0, 80 + progress * 30, 70, 90, 0, 0, Math.PI * 2);
-      ctx.fill();
+    // Arterial Blood Splatters bursting onto the lens & dripping down
+    for (const s of this.bloodSplatters) {
+      if (progress >= s.appearTime) {
+        const localProg = (progress - s.appearTime) / (1 - s.appearTime);
+        const curRadius = Math.min(s.maxRadius, s.maxRadius * (localProg * 3));
 
-      // Sharp razor teeth
-      ctx.fillStyle = '#e2e8f0';
-      for (let t = -50; t <= 50; t += 12) {
+        // Core splatter
+        ctx.fillStyle = 'rgba(120, 8, 14, 0.9)';
         ctx.beginPath();
-        ctx.moveTo(t, 40);
-        ctx.lineTo(t + 6, 75);
-        ctx.lineTo(t + 12, 40);
+        ctx.arc(s.x, s.y, curRadius, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.beginPath();
-        ctx.moveTo(t, 130 + progress * 30);
-        ctx.lineTo(t + 6, 95 + progress * 30);
-        ctx.lineTo(t + 12, 130 + progress * 30);
-        ctx.fill();
+        // Surrounding droplet bursts
+        ctx.fillStyle = 'rgba(140, 10, 16, 0.85)';
+        for (const drop of s.droplets) {
+          ctx.beginPath();
+          ctx.arc(s.x + drop.ox, s.y + drop.oy, drop.rad, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Dripping blood trails
+        if (localProg > 0.2) {
+          const dripProg = (localProg - 0.2) / 0.8;
+          const currentDrip = s.dripLength * dripProg;
+          ctx.fillStyle = 'rgba(110, 6, 10, 0.88)';
+          ctx.fillRect(s.x - s.dripWidth / 2, s.y, s.dripWidth, currentDrip);
+
+          // Teardrop bead at bottom of drip
+          ctx.beginPath();
+          ctx.arc(s.x, s.y + currentDrip, s.dripWidth * 1.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
+    }
 
-      ctx.restore();
+    // Red horror vignette tightening around screen
+    if (progress > 0.3) {
+      const vProg = (progress - 0.3) / 0.7;
+      const vGrad = ctx.createRadialGradient(w / 2, h / 2, w * 0.2, w / 2, h / 2, w * 0.65);
+      vGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vGrad.addColorStop(1, `rgba(90, 0, 10, ${Math.min(0.85, vProg * 1.1)})`);
+      ctx.fillStyle = vGrad;
+      ctx.fillRect(0, 0, w, h);
+    }
 
-      // Glitch / static lines
-      for (let i = 0; i < 20; i++) {
-        ctx.fillStyle = `rgba(255, ${Math.random() * 50}, ${Math.random() * 50}, ${Math.random() * 0.4})`;
-        ctx.fillRect(0, Math.random() * canvas.height, canvas.width, 2 + Math.random() * 8);
-      }
+    // Final Blackout Fade to Dead
+    if (progress > 0.72) {
+      const blackAlpha = Math.min(1.0, (progress - 0.72) / 0.28);
+      ctx.fillStyle = `rgba(3, 2, 4, ${blackAlpha})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
 
-      if (frame < maxFrames) {
-        requestAnimationFrame(animate);
-      } else {
-        this.jumpscareOverlay.style.display = 'none';
-        if (onComplete) onComplete();
-      }
-    };
-
-    requestAnimationFrame(animate);
+  hideJumpscareOverlay() {
+    this.jumpscareOverlay.style.display = 'none';
+    if (this.jumpscareCtx && this.jumpscareCanvas) {
+      this.jumpscareCtx.clearRect(0, 0, this.jumpscareCanvas.width, this.jumpscareCanvas.height);
+    }
   }
 }

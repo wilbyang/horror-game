@@ -547,13 +547,14 @@
       z-index: 90;
       pointer-events: none;
       display: none;
-      background: #000;
+      background: transparent;
       overflow: hidden;
     }
     #jumpscare-canvas {
       width: 100%;
       height: 100%;
       display: block;
+      pointer-events: none;
     }
     #jumpscare-blood {
       position: absolute;
@@ -561,9 +562,10 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: radial-gradient(circle, transparent 20%, rgba(130, 0, 0, 0.8) 70%, #400 100%);
-      mix-blend-mode: multiply;
-      opacity: 0.9;
+      pointer-events: none;
+      background: radial-gradient(circle, transparent 25%, rgba(160, 0, 0, 0.6) 70%, #200 100%);
+      opacity: 0;
+      transition: opacity 0.15s ease;
     }
 
     /* Victory & Defeat screens */

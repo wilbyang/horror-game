@@ -153,6 +153,7 @@ class Game {
     this.keys = [];
 
     // Reset game state
+    this.ui.hideJumpscareOverlay();
     this.collectedKeys = { ruby: false, sapphire: false, topaz: false };
     this.keysCount = 0;
     this.ui.updateKeys(this.collectedKeys);
@@ -269,7 +270,7 @@ class Game {
       this.elapsedTime += delta;
       this.updateGame(delta, this.gameTotalTime);
     } else if (this.state === GAME_STATE.JUMPSCARE) {
-      // Jumpscare animation handles itself
+      this.updateJumpscareSequence(delta);
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -398,17 +399,58 @@ class Game {
     this.player.controls.unlock();
     this.sound.playJumpscare();
 
-    // Look directly into monster's eyes
-    this.camera.lookAt(
+    this.jumpscareStartTime = performance.now();
+    this.jumpscareDuration = 2.8; // seconds
+    this.jumpscarePlayerPos = this.camera.position.clone();
+    this.jumpscareCamBaseY = this.camera.position.y;
+
+    this.ui.startJumpscareOverlay();
+  }
+
+  updateJumpscareSequence(delta) {
+    const elapsed = (performance.now() - this.jumpscareStartTime) / 1000;
+    const progress = Math.min(1.0, elapsed / this.jumpscareDuration);
+
+    // 1. Monster lunges into the camera lens with unhinged jaws and reaching claws
+    this.monster.animateJumpscareLunge(progress, this.camera.position);
+
+    // Move monster rapidly up to 0.45m from the camera face
+    const toCam = new THREE.Vector3().subVectors(this.camera.position, this.monster.group.position);
+    toCam.y = 0;
+    if (toCam.length() > 0.45) {
+      toCam.normalize();
+      this.monster.group.position.addScaledVector(toCam, delta * 5.2);
+    }
+
+    // Camera locks directly on monster's terrifying gaping maw & glowing eyes
+    const monsterMaw = new THREE.Vector3(
       this.monster.group.position.x,
-      this.monster.group.position.y + 1.8,
+      this.monster.group.position.y + 1.85,
       this.monster.group.position.z
     );
+    this.camera.lookAt(monsterMaw);
 
-    this.ui.playJumpscare(() => {
+    // Violent screen trauma vibration
+    const shake = Math.sin(elapsed * 48) * Math.max(0.02, (1.0 - progress) * 0.12);
+    this.camera.position.x = this.jumpscarePlayerPos.x + (Math.random() - 0.5) * shake;
+    this.camera.position.z = this.jumpscarePlayerPos.z + (Math.random() - 0.5) * shake;
+
+    // Player collapses to the bloody stone floor
+    if (progress > 0.35) {
+      const fallProg = Math.min(1.0, (progress - 0.35) / 0.45);
+      this.camera.position.y = THREE.MathUtils.lerp(this.jumpscareCamBaseY, 0.35, fallProg);
+      this.camera.rotation.z += Math.sin(fallProg * Math.PI * 0.5) * 0.65;
+    }
+
+    // 2. Render 2D arterial gore, claw scratches & blood drip overlay
+    this.ui.renderJumpscareGore(progress);
+
+    // 3. Complete kill & transition to Game Over
+    if (progress >= 1.0) {
       this.state = GAME_STATE.GAMEOVER;
+      this.ui.hideJumpscareOverlay();
       this.ui.showGameOver(this.elapsedTime, this.keysCount);
-    });
+    }
   }
 
   triggerVictory() {
