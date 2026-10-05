@@ -349,12 +349,16 @@ class Game {
     const startBtn = document.getElementById('start-btn');
     startBtn.addEventListener('click', () => {
       if (this.gameMode === 'coop') {
+        if (!this.coopRoomCode) {
+          this.ui.notify('Please Create a Room (Host) or enter a Code to Join first!', 4000);
+          return;
+        }
         if (!this.isCoopHost) {
-          this.ui.notify('Waiting for Host to launch the game!', 3000);
+          this.ui.notify('Joined as Player 2. Waiting for Host to launch the game!', 3500);
           return;
         }
         if (!this.coopConnected) {
-          this.ui.notify('Waiting for Player 2 to join before starting!', 3500);
+          this.ui.notify(`Room [${this.coopRoomCode}] created! Share code and wait for Player 2 to join.`, 4500);
           return;
         }
       }

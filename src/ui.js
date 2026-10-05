@@ -141,6 +141,11 @@ export class UIController {
       if (this.btnModeSolo) this.btnModeSolo.classList.remove('active');
       if (this.btnModeCoop) this.btnModeCoop.classList.add('active');
       if (this.coopLobbyPanel) this.coopLobbyPanel.style.display = 'block';
+      if (this.joinRoomInput) {
+        setTimeout(() => {
+          try { this.joinRoomInput.focus(); } catch (e) {}
+        }, 100);
+      }
     }
     if (callback) callback(mode);
   }
@@ -657,29 +662,61 @@ export class UIController {
 
   setupCoopButtons(onHost, onJoin, onCopyLink) {
     if (this.btnCreateRoom) {
-      this.btnCreateRoom.addEventListener('click', () => {
+      this.btnCreateRoom.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (onHost) onHost();
       });
     }
 
     if (this.btnJoinRoom) {
-      this.btnJoinRoom.addEventListener('click', () => {
-        const code = this.joinRoomInput ? this.joinRoomInput.value.trim().toUpperCase() : '';
-        if (onJoin) onJoin(code);
+      this.btnJoinRoom.addEventListener('click', (e) => {
+        e.stopPropagation();
+        let code = this.joinRoomInput ? this.joinRoomInput.value.trim().toUpperCase() : '';
+        if (!code) {
+          // If input is empty, provide a prompt dialog as an instant fallback
+          const promptCode = window.prompt("Enter 4-letter Room Code from Host (e.g. W8X2):");
+          if (promptCode) {
+            code = promptCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            if (this.joinRoomInput) this.joinRoomInput.value = code;
+          }
+        }
+        if (onJoin && code) onJoin(code);
       });
     }
 
     if (this.joinRoomInput) {
+      // Auto-capitalize, sanitize, and limit length
+      this.joinRoomInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+      });
+
+      // Stop propagation so typing does not trigger in-game control hotkeys
       this.joinRoomInput.addEventListener('keydown', (e) => {
+        e.stopPropagation();
         if (e.key === 'Enter') {
           const code = this.joinRoomInput.value.trim().toUpperCase();
-          if (onJoin) onJoin(code);
+          if (onJoin && code) onJoin(code);
+        }
+      });
+
+      this.joinRoomInput.addEventListener('keyup', (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    // Clicking anywhere on the Join card focuses the input
+    const cardJoin = document.getElementById('card-join');
+    if (cardJoin && this.joinRoomInput) {
+      cardJoin.addEventListener('click', (e) => {
+        if (e.target !== this.btnJoinRoom) {
+          this.joinRoomInput.focus();
         }
       });
     }
 
     if (this.btnCopyLink) {
-      this.btnCopyLink.addEventListener('click', () => {
+      this.btnCopyLink.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (onCopyLink) onCopyLink();
       });
     }

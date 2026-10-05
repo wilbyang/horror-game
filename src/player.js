@@ -64,6 +64,9 @@ export class Player {
 
   setupKeyListeners() {
     const onKeyDown = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        return;
+      }
       switch (e.code) {
         case 'KeyW':
         case 'ArrowUp':
@@ -95,6 +98,9 @@ export class Player {
     };
 
     const onKeyUp = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        return;
+      }
       switch (e.code) {
         case 'KeyW':
         case 'ArrowUp':

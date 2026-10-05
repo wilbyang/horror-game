@@ -16,6 +16,10 @@
       user-select: none;
       -webkit-user-select: none;
     }
+    input, textarea {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
     html, body {
       width: 100%;
       height: 100%;
@@ -869,25 +873,54 @@
       border: 1px dashed rgba(56, 189, 248, 0.4);
       min-width: 140px;
     }
+    .room-input-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 4px 0;
+    }
     .room-input {
       width: 100%;
-      max-width: 150px;
-      background: rgba(2, 6, 23, 0.8);
-      border: 1px solid rgba(56, 189, 248, 0.5);
-      border-radius: 4px;
-      padding: 8px 12px;
-      font-size: 20px;
-      font-weight: bold;
-      letter-spacing: 4px;
+      max-width: 170px;
+      background: rgba(2, 6, 23, 0.95);
+      border: 2px solid #38bdf8;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 6px;
       text-transform: uppercase;
-      color: #f1f5f9;
+      color: #38bdf8;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
       text-align: center;
       outline: none;
-      margin: 6px 0;
+      margin: 4px 0;
+      cursor: text !important;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      pointer-events: auto !important;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+      transition: all 0.2s ease;
     }
     .room-input:focus {
-      border-color: #38bdf8;
-      box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+      border-color: #00f0ff;
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.8), inset 0 0 8px rgba(0, 240, 255, 0.3);
+      transform: scale(1.04);
+      background: rgba(2, 6, 23, 1);
+    }
+    .room-input::placeholder {
+      color: rgba(148, 163, 184, 0.4);
+      font-size: 16px;
+      letter-spacing: 3px;
+      font-weight: normal;
+    }
+    .room-input-hint {
+      font-size: 10px;
+      color: #64748b;
+      letter-spacing: 1px;
+      margin-top: 2px;
     }
     .coop-card-actions {
       display: flex;
@@ -1231,9 +1264,12 @@
         <div class="coop-card" id="card-join">
           <div class="coop-card-header">JOIN A ROOM</div>
           <p class="coop-card-desc">Enter your friend's 4-letter room code to connect.</p>
-          <input type="text" class="room-input" id="join-room-input" placeholder="CODE" maxlength="6" autocomplete="off" spellcheck="false" />
+          <div class="room-input-container">
+            <input type="text" class="room-input" id="join-room-input" placeholder="CODE" maxlength="6" autocomplete="off" spellcheck="false" />
+            <span class="room-input-hint">CLICK TO TYPE OR PASTE CODE</span>
+          </div>
           <div class="coop-card-actions">
-            <button class="coop-btn" id="btn-join-room">JOIN ROOM</button>
+            <button class="coop-btn" id="btn-join-room">CONNECT / JOIN</button>
           </div>
           <div class="coop-status" id="join-status">Ready to connect</div>
         </div>
