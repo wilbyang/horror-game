@@ -11,11 +11,13 @@ export const MONSTER_STATE = {
 };
 
 export class Monster {
-  constructor(scene, maze, soundEngine, isWorld2 = false) {
+  constructor(scene, maze, soundEngine, isWorld2 = false, variant = 0) {
     this.scene = scene;
     this.maze = maze;
     this.sound = soundEngine;
     this.isWorld2 = isWorld2;
+    this.variant = variant; // 0 = Stalker Alpha (Crimson Fiend), 1 = Stalker Beta (Void Specter)
+    this.name = this.isWorld2 ? (variant === 1 ? 'Stalker Beta' : 'Stalker Alpha') : 'Dread Walker';
 
     this.group = new THREE.Group();
     this.group.position.set(0, 0, 0);
@@ -23,6 +25,7 @@ export class Monster {
     // AI States
     this.state = MONSTER_STATE.PATROL;
     this.targetPos = new THREE.Vector3();
+    this.targetRotY = 0;
     this.currentPath = [];
     this.pathIndex = 0;
 
@@ -66,8 +69,17 @@ export class Monster {
   }
 
   buildRealisticMonster() {
+    const isBeta = (this.isWorld2 && this.variant === 1);
+
     // Realistic PBR Necrotic Flesh Material
-    const skinTex = this.isWorld2 ? TextureGenerator.createAbyssalMonsterSkinTexture() : TextureGenerator.createMonsterSkinTexture();
+    let skinTex;
+    if (this.isWorld2) {
+      skinTex = isBeta
+        ? TextureGenerator.createVoidMonsterSkinTexture()
+        : TextureGenerator.createCrimsonMonsterSkinTexture();
+    } else {
+      skinTex = TextureGenerator.createMonsterSkinTexture();
+    }
     const roughTex = TextureGenerator.createMonsterRoughnessTexture();
     const boneTex = this.isWorld2 ? TextureGenerator.createAbyssalMonsterBoneTexture() : TextureGenerator.createMonsterBoneTexture();
 
@@ -75,16 +87,16 @@ export class Monster {
       map: skinTex,
       roughnessMap: roughTex,
       roughness: 0.65,
-      metalness: this.isWorld2 ? 0.3 : 0.18,
+      metalness: this.isWorld2 ? 0.32 : 0.18,
       bumpMap: skinTex,
       bumpScale: 0.05,
-      emissive: this.isWorld2 ? 0x220512 : 0x000000,
-      emissiveIntensity: this.isWorld2 ? 0.65 : 0
+      emissive: isBeta ? 0x240638 : (this.isWorld2 ? 0x330512 : 0x000000),
+      emissiveIntensity: this.isWorld2 ? 0.75 : 0
     });
 
     const boneMat = new THREE.MeshStandardMaterial({
       map: boneTex,
-      color: this.isWorld2 ? 0x221122 : 0xffffff,
+      color: isBeta ? 0x24122e : (this.isWorld2 ? 0x2b1016 : 0xffffff),
       roughness: 0.65,
       metalness: this.isWorld2 ? 0.35 : 0.1,
       bumpMap: boneTex,
@@ -93,20 +105,20 @@ export class Monster {
 
     const fangMat = new THREE.MeshStandardMaterial({
       color: this.isWorld2 ? 0xffffff : 0xe8e0cf,
-      emissive: this.isWorld2 ? 0x440015 : 0x000000,
-      emissiveIntensity: this.isWorld2 ? 0.6 : 0,
+      emissive: isBeta ? 0x4c0a78 : (this.isWorld2 ? 0x550015 : 0x000000),
+      emissiveIntensity: this.isWorld2 ? 0.75 : 0,
       roughness: 0.25,
       metalness: 0.15
     });
 
     const mouthInsideMat = new THREE.MeshStandardMaterial({
-      color: this.isWorld2 ? 0x120208 : 0x1f060a,
+      color: isBeta ? 0x19032b : (this.isWorld2 ? 0x1a0208 : 0x1f060a),
       roughness: 0.2,
       metalness: 0.1
     });
 
     const eyeMat = new THREE.MeshBasicMaterial({
-      color: this.isWorld2 ? 0xff0044 : 0xff0022
+      color: isBeta ? 0xa855f7 : (this.isWorld2 ? 0xff0033 : 0xff0022)
     });
 
     // Root Torso
@@ -152,8 +164,9 @@ export class Monster {
     // Exposed Pulsating Viscera / Dark Heart inside ribcage
     const heartGeo = new THREE.DodecahedronGeometry(0.14, 1);
     const heartMat = new THREE.MeshStandardMaterial({
-      color: 0x440810,
-      emissive: 0x220005,
+      color: isBeta ? 0x3b0764 : (this.isWorld2 ? 0x440810 : 0x220508),
+      emissive: isBeta ? 0x9333ea : (this.isWorld2 ? 0xdd1133 : 0x220005),
+      emissiveIntensity: this.isWorld2 ? 0.95 : 0.3,
       roughness: 0.15,
       metalness: 0.2
     });
@@ -228,7 +241,7 @@ export class Monster {
       }
 
       // Secondary Upper Eyes (Quad blazing gaze)
-      const eyeMatQuad = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+      const eyeMatQuad = new THREE.MeshBasicMaterial({ color: isBeta ? 0xe879f9 : 0xff2a55 });
       const eyeUpperL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), eyeMatQuad);
       eyeUpperL.position.set(-0.16, 0.16, 0.28);
       this.head.add(eyeUpperL);
@@ -239,7 +252,8 @@ export class Monster {
     }
 
     // Eye spotlight beams cutting through dark corridors
-    this.eyeLight = new THREE.SpotLight(0xff0820, 4.5, 16, Math.PI / 4, 0.6, 1.8);
+    const spotColor = isBeta ? 0x9333ea : (this.isWorld2 ? 0xff0033 : 0xff0820);
+    this.eyeLight = new THREE.SpotLight(spotColor, 4.5, 16, Math.PI / 4, 0.6, 1.8);
     this.eyeLight.position.set(0, 0.06, 0.35);
     const eyeTarget = new THREE.Object3D();
     eyeTarget.position.set(0, -0.3, 6);
@@ -248,7 +262,8 @@ export class Monster {
     this.eyeLight.target = eyeTarget;
 
     // Intense horror illumination light for jumpscare (vividly lights up the face, fangs, and eyes)
-    this.jumpscareFaceLight = new THREE.PointLight(0xff2233, 0, 4.5, 1.2);
+    const faceLightColor = isBeta ? 0xc026d3 : 0xff2233;
+    this.jumpscareFaceLight = new THREE.PointLight(faceLightColor, 0, 4.5, 1.2);
     this.jumpscareFaceLight.position.set(0, 0.15, 0.55);
     this.head.add(this.jumpscareFaceLight);
 
@@ -434,9 +449,24 @@ export class Monster {
   }
 
   pickNewPatrolDestination() {
+    const s = this.maze.size;
+    const mid = Math.floor(s / 2);
+
     for (let i = 0; i < 40; i++) {
-      const gx = 1 + Math.floor(Math.random() * (this.maze.size - 2));
-      const gz = 1 + Math.floor(Math.random() * (this.maze.size - 2));
+      let minGx = 1, maxGx = s - 2;
+      let minGz = 1, maxGz = s - 2;
+
+      // In World 2, encourage the 2 stalkers to patrol separate sectors 70% of the time
+      if (this.isWorld2 && Math.random() < 0.7) {
+        if (this.variant === 0) {
+          maxGx = mid; // West wing
+        } else if (this.variant === 1) {
+          minGx = mid; // East wing
+        }
+      }
+
+      const gx = minGx + Math.floor(Math.random() * (maxGx - minGx + 1));
+      const gz = minGz + Math.floor(Math.random() * (maxGz - minGz + 1));
 
       if (this.maze.isWalkable(gx, gz)) {
         const dest = this.maze.gridToWorld(gx, gz);
@@ -466,7 +496,7 @@ export class Monster {
     this.pathIndex = 0;
     if (this.sound) {
       const dist = this.group.position.distanceTo(noisePos);
-      this.sound.playMonsterRoar(dist, false);
+      this.sound.playMonsterRoar(dist, false, this.variant);
     }
   }
 
@@ -522,7 +552,7 @@ export class Monster {
       if (this.state !== MONSTER_STATE.CHASE) {
         this.state = MONSTER_STATE.CHASE;
         if (this.sound) {
-          this.sound.playMonsterRoar(distToPlayer, true);
+          this.sound.playMonsterRoar(distToPlayer, true, this.variant);
         }
       }
       this.lostPlayerTimer = 0;
@@ -594,6 +624,61 @@ export class Monster {
     this.animateMovement(delta, moveSpeed);
 
     // Footstep audio
+    const stepInterval = (this.state === MONSTER_STATE.CHASE) ? (this.isWorld2 ? 0.25 : 0.34) : 0.62;
+    this.stepTimer += delta;
+    if (this.stepTimer >= stepInterval) {
+      this.stepTimer = 0;
+      if (this.sound) {
+        let stereoPan = 0;
+        if (camera) {
+          const toMonster = new THREE.Vector3().subVectors(this.group.position, playerPos);
+          toMonster.y = 0;
+          if (toMonster.lengthSq() > 0.001) {
+            toMonster.normalize();
+            const camRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            stereoPan = Math.max(-1, Math.min(1, toMonster.dot(camRight)));
+          }
+        }
+        this.sound.playMonsterStep(distToPlayer, stereoPan);
+      }
+    }
+  }
+
+  // Smooth remote interpolation for Guest players in Co-op mode
+  updateAsRemote(delta, camera, playerPos) {
+    if (!this.targetPos) this.targetPos = new THREE.Vector3().copy(this.group.position);
+
+    // Smooth position interpolation from network packets
+    this.group.position.lerp(this.targetPos, Math.min(1.0, delta * 16));
+
+    // Smooth yaw rotation interpolation
+    if (this.targetRotY !== undefined) {
+      let diff = this.targetRotY - this.group.rotation.y;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      this.group.rotation.y += diff * Math.min(1.0, delta * 16);
+    }
+
+    const distToPlayer = Math.hypot(
+      this.group.position.x - playerPos.x,
+      this.group.position.z - playerPos.z
+    );
+
+    // Dynamic eye spotlight flicker
+    if (this.eyeLight) {
+      this.eyeLight.intensity = (this.state === MONSTER_STATE.CHASE)
+        ? (5.5 + Math.sin(performance.now() * 0.02) * 1.5)
+        : (3.8 + Math.sin(performance.now() * 0.005) * 0.8);
+    }
+
+    if (this.state === MONSTER_STATE.STUNNED) {
+      this.animateStunned(delta);
+    } else {
+      const speed = (this.state === MONSTER_STATE.CHASE) ? this.chaseSpeed : this.patrolSpeed;
+      this.animateMovement(delta, speed);
+    }
+
+    // Footstep audio with spatial 3D stereo panning for guest
     const stepInterval = (this.state === MONSTER_STATE.CHASE) ? (this.isWorld2 ? 0.25 : 0.34) : 0.62;
     this.stepTimer += delta;
     if (this.stepTimer >= stepInterval) {

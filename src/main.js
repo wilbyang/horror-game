@@ -281,10 +281,10 @@ class Game {
           msg.monsters.forEach((mData, idx) => {
             if (this.monsters[idx]) {
               const m = this.monsters[idx];
-              m.group.position.set(mData.x, mData.y, mData.z);
-              m.group.rotation.y = mData.rotY;
+              if (!m.targetPos) m.targetPos = new THREE.Vector3().copy(m.group.position);
+              m.targetPos.set(mData.x, mData.y, mData.z);
+              m.targetRotY = mData.rotY;
               m.state = mData.state;
-              m.animateMovement(0.016, (mData.state === 'CHASE' ? m.chaseSpeed : m.patrolSpeed));
             }
           });
         }
@@ -524,48 +524,16 @@ class Game {
     const spawnX = (this.gameMode === 'coop') ? this.maze.spawnPos.x - 1.2 : this.maze.spawnPos.x;
     this.player.resetPosition(new THREE.Vector3(spawnX, this.maze.spawnPos.y, this.maze.spawnPos.z));
 
-    if (this.gameMode === 'coop') {
-      const remoteX = this.maze.spawnPos.x + 1.2;
-      this.remotePlayer = new RemotePlayer(this.scene, this.sound, 'PLAYER 2');
-      this.remotePlayer.group.position.set(remoteX, 0, this.maze.spawnPos.z);
-      this.remotePlayer.targetPos.set(remoteX, 0, this.maze.spawnPos.z);
-      this.ui.showTeammateHUD(true, 'PLAYER 2');
-
-      // Send maze layout to Guest with robust serialization and redundancy
-      const coopStartPacket = {
-        type: 'START_COOP_GAME',
-        worldLevel: this.currentWorld,
-        difficulty: this.ui.selectedDifficulty,
-        mazeSize: this.maze.size,
-        mazeGrid: this.maze.grid,
-        keyPositions: this.maze.keyPositions.map(k => ({
-          id: k.id,
-          name: k.name,
-          color: k.color,
-          grid: k.grid,
-          pos: { x: k.pos.x, y: k.pos.y, z: k.pos.z }
-        })),
-        exitPos: { x: this.maze.exitPos.x, y: this.maze.exitPos.y, z: this.maze.exitPos.z },
-        spawnPos: { x: this.maze.spawnPos.x, y: this.maze.spawnPos.y, z: this.maze.spawnPos.z }
-      };
-
-      this.network.send(coopStartPacket);
-      setTimeout(() => this.network.send(coopStartPacket), 250);
-      setTimeout(() => this.network.send(coopStartPacket), 600);
-    } else {
-      this.ui.showTeammateHUD(false);
-    }
-
-    // Spawn Monsters: World 1 has 1 Dread Walker; World 2 has 2 Abyssal Stalkers!
+    // Spawn Monsters: World 1 has 1 Dread Walker; World 2 has 2 Abyssal Stalkers (Alpha & Beta)!
     const monsterCount = (this.currentWorld === 2) ? 2 : 1;
     this.monsters = [];
 
     for (let i = 0; i < monsterCount; i++) {
-      const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
+      const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2, i);
 
       // Adjust monster difficulty
       if (this.currentWorld === 2) {
-        // World 2: Abyssal Stalker is aggressive and faster than player's 4.4 walkSpeed!
+        // World 2: Abyssal Stalkers are aggressive and faster than player's 4.4 walkSpeed!
         if (this.ui.selectedDifficulty === 'easy') {
           monster.patrolSpeed = 2.2;
           monster.chaseSpeed = 4.45;
@@ -594,6 +562,47 @@ class Game {
       this.spawnMonsterFarAway(monster);
     }
 
+    if (this.gameMode === 'coop') {
+      const remoteX = this.maze.spawnPos.x + 1.2;
+      this.remotePlayer = new RemotePlayer(this.scene, this.sound, 'PLAYER 2');
+      this.remotePlayer.group.position.set(remoteX, 0, this.maze.spawnPos.z);
+      this.remotePlayer.targetPos.set(remoteX, 0, this.maze.spawnPos.z);
+      this.ui.showTeammateHUD(true, 'PLAYER 2');
+
+      // Send maze layout and initial monster spawn coordinates to Guest with redundancy
+      const coopStartPacket = {
+        type: 'START_COOP_GAME',
+        worldLevel: this.currentWorld,
+        difficulty: this.ui.selectedDifficulty,
+        mazeSize: this.maze.size,
+        mazeGrid: this.maze.grid,
+        keyPositions: this.maze.keyPositions.map(k => ({
+          id: k.id,
+          name: k.name,
+          color: k.color,
+          grid: k.grid,
+          pos: { x: k.pos.x, y: k.pos.y, z: k.pos.z }
+        })),
+        exitPos: { x: this.maze.exitPos.x, y: this.maze.exitPos.y, z: this.maze.exitPos.z },
+        spawnPos: { x: this.maze.spawnPos.x, y: this.maze.spawnPos.y, z: this.maze.spawnPos.z },
+        monsterSpawns: this.monsters.map((m, idx) => ({
+          id: idx,
+          variant: m.variant,
+          x: m.group.position.x,
+          y: m.group.position.y,
+          z: m.group.position.z,
+          rotY: m.group.rotation.y,
+          state: m.state
+        }))
+      };
+
+      this.network.send(coopStartPacket);
+      setTimeout(() => this.network.send(coopStartPacket), 250);
+      setTimeout(() => this.network.send(coopStartPacket), 600);
+    } else {
+      this.ui.showTeammateHUD(false);
+    }
+
     // Hide modals and show HUD
     this.ui.titleScreen.style.display = 'none';
     this.ui.gameoverScreen.style.display = 'none';
@@ -602,7 +611,7 @@ class Game {
     this.ui.showHUD();
 
     if (this.currentWorld === 2) {
-      this.ui.notify('WORLD 2: Recover all 5 Abyssal Relics to escape through the Void Portal. TWO Stalkers are hunting you!', 5500);
+      this.ui.notify('⚠️ THE ABYSS: TWO APEX STALKERS ARE HUNTING YOU! (ALPHA & BETA)', 5500);
     } else {
       this.ui.notify('Find 3 Ancient Keys to unlock the South Exit Gate...', 4000);
     }
@@ -714,8 +723,16 @@ class Game {
       // Visual Monsters (Guest follows Host updates)
       const monsterCount = (this.currentWorld === 2) ? 2 : 1;
       this.monsters = [];
+      const spawns = data.monsterSpawns || [];
       for (let i = 0; i < monsterCount; i++) {
-        const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
+        const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2, i);
+        if (spawns[i]) {
+          monster.group.position.set(spawns[i].x, spawns[i].y, spawns[i].z);
+          monster.group.rotation.y = spawns[i].rotY || 0;
+          monster.targetPos = new THREE.Vector3(spawns[i].x, spawns[i].y, spawns[i].z);
+          monster.targetRotY = spawns[i].rotY || 0;
+          monster.state = spawns[i].state || MONSTER_STATE.PATROL;
+        }
         this.monsters.push(monster);
       }
 
@@ -749,10 +766,22 @@ class Game {
     // Find an open walkable spot in the maze distant from player spawn and any already-spawned monster
     let bestDist = 0;
     let bestPos = new THREE.Vector3();
+    const s = this.maze.size;
+    const midX = Math.floor(s / 2);
 
-    for (let attempts = 0; attempts < 60; attempts++) {
-      const gx = 1 + Math.floor(Math.random() * (this.maze.size - 2));
-      const gz = 1 + Math.floor(Math.random() * (this.maze.size - 2));
+    for (let attempts = 0; attempts < 80; attempts++) {
+      let minGx = 1, maxGx = s - 2;
+      // In World 2, separate initial monster spawns into West and East wings of the maze
+      if (this.currentWorld === 2 && this.monsters.length > 1) {
+        if (monster.variant === 0) {
+          maxGx = midX; // West half
+        } else if (monster.variant === 1) {
+          minGx = midX; // East half
+        }
+      }
+
+      const gx = minGx + Math.floor(Math.random() * (maxGx - minGx + 1));
+      const gz = 1 + Math.floor(Math.random() * (s - 2));
 
       if (this.maze.isWalkable(gx, gz)) {
         const wPos = this.maze.gridToWorld(gx, gz);
@@ -766,7 +795,7 @@ class Game {
           }
         }
 
-        const score = distToSpawn + Math.min(distToOtherMonsters, 30);
+        const score = distToSpawn * 0.8 + Math.min(distToOtherMonsters, 50) * 1.5;
         if (score > bestDist) {
           bestDist = score;
           bestPos.copy(wPos);
@@ -777,7 +806,12 @@ class Game {
   }
 
   triggerSonarPulse() {
-    const monsterPositions = this.monsters.map(m => m.group.position);
+    const monsterData = this.monsters.map((m, idx) => ({
+      pos: m.group.position,
+      variant: m.variant,
+      name: m.name,
+      state: m.state
+    }));
     const teammatePos = (this.gameMode === 'coop' && this.remotePlayer)
       ? this.remotePlayer.group.position
       : null;
@@ -785,7 +819,7 @@ class Game {
       this.maze,
       this.player.camera.position,
       this.getPlayerYaw(),
-      monsterPositions,
+      monsterData,
       this.keys,
       teammatePos
     );
@@ -846,33 +880,75 @@ class Game {
     let anyMonsterChasing = false;
     let anyMonsterInvestigating = false;
     let caughtByMonster = null;
+    let closeMonsterCount = 0;
 
-    for (const monster of this.monsters) {
-      // Check if player is shining flashlight directly at this monster
-      const isLighting = this.player.isLightingObject(monster.group.position);
+    if (this.gameMode === 'coop' && !this.isCoopHost) {
+      // Guest: Smoothly interpolate monster movements from Host's network synchronization
+      for (const monster of this.monsters) {
+        monster.updateAsRemote(delta, this.camera, playerPos);
 
-      // Update Monster AI with camera for spatial 3D audio
-      monster.update(delta, playerPos, playerNoise, isLighting, this.camera);
+        const dist = Math.hypot(
+          monster.group.position.x - playerPos.x,
+          monster.group.position.z - playerPos.z
+        );
 
-      // Flat horizontal distance to monster in maze
-      const dist = Math.hypot(
-        monster.group.position.x - playerPos.x,
-        monster.group.position.z - playerPos.z
-      );
+        if (dist < nearestMonsterDist) nearestMonsterDist = dist;
+        if (dist < 22) closeMonsterCount++;
+        if (monster.state === MONSTER_STATE.CHASE) anyMonsterChasing = true;
+        if (monster.state === MONSTER_STATE.INVESTIGATE) anyMonsterInvestigating = true;
 
-      if (dist < nearestMonsterDist) {
-        nearestMonsterDist = dist;
+        if (dist < 1.95 && !caughtByMonster && !this.player.isDowned) {
+          caughtByMonster = monster;
+        }
       }
-      if (monster.state === MONSTER_STATE.CHASE) {
-        anyMonsterChasing = true;
-      }
-      if (monster.state === MONSTER_STATE.INVESTIGATE) {
-        anyMonsterInvestigating = true;
+    } else {
+      // Solo or Host: Run authoritative AI simulation
+      for (const monster of this.monsters) {
+        const isLightingLocal = this.player.isLightingObject(monster.group.position);
+        const isLightingRemote = (this.remotePlayer && this.remotePlayer.flashlightOn)
+          ? this.remotePlayer.isLightingObject(monster.group.position)
+          : false;
+
+        monster.update(delta, playerPos, playerNoise, (isLightingLocal || isLightingRemote), this.camera);
+
+        const dist = Math.hypot(
+          monster.group.position.x - playerPos.x,
+          monster.group.position.z - playerPos.z
+        );
+
+        if (dist < nearestMonsterDist) nearestMonsterDist = dist;
+        if (dist < 22) closeMonsterCount++;
+        if (monster.state === MONSTER_STATE.CHASE) anyMonsterChasing = true;
+        if (monster.state === MONSTER_STATE.INVESTIGATE) anyMonsterInvestigating = true;
+
+        if (dist < 1.95 && !caughtByMonster && !this.player.isDowned) {
+          caughtByMonster = monster;
+        }
       }
 
-      // Catch / Jumpscare check: Monster caught player!
-      if (dist < 1.95 && !caughtByMonster) {
-        caughtByMonster = monster;
+      // Soft monster-monster physical repulsion in World 2 so they never overlap/merge
+      if (this.monsters.length > 1) {
+        for (let i = 0; i < this.monsters.length; i++) {
+          for (let j = i + 1; j < this.monsters.length; j++) {
+            const m1 = this.monsters[i];
+            const m2 = this.monsters[j];
+            const dx = m2.group.position.x - m1.group.position.x;
+            const dz = m2.group.position.z - m1.group.position.z;
+            const dist = Math.hypot(dx, dz);
+            const minDist = 2.4;
+            if (dist < minDist && dist > 0.001) {
+              const overlap = (minDist - dist) * 0.5;
+              const nx = dx / dist;
+              const nz = dz / dist;
+              m1.group.position.x -= nx * overlap;
+              m1.group.position.z -= nz * overlap;
+              m2.group.position.x += nx * overlap;
+              m2.group.position.z += nz * overlap;
+              this.maze.resolveCollision(m1.group.position, 0.65);
+              this.maze.resolveCollision(m2.group.position, 0.65);
+            }
+          }
+        }
       }
     }
 
@@ -882,8 +958,8 @@ class Game {
       this.camera.position.y += (Math.random() - 0.5) * rumble;
     }
 
-    // Update Threat & Heartbeat based on nearest monster
-    const threat = this.ui.updateThreat(nearestMonsterDist, anyMonsterChasing);
+    // Update Threat & Heartbeat based on nearest monster and multi-monster presence
+    const threat = this.ui.updateThreat(nearestMonsterDist, anyMonsterChasing, this.monsters.length, closeMonsterCount > 1);
     this.sound.setThreatLevel(threat);
 
     // Update UI HUD
@@ -898,14 +974,19 @@ class Game {
       : null;
     this.ui.updateCompass(this.getPlayerYaw(), playerPos, this.keys, this.exitGate, teammatePos);
 
-    // Update Sonar Radar with all monster positions & teammate
-    const monsterPositions = this.monsters.map(m => m.group.position);
+    // Update Sonar Radar with all monster data & teammate
+    const monsterData = this.monsters.map((m, idx) => ({
+      pos: m.group.position,
+      variant: m.variant,
+      name: m.name,
+      state: m.state
+    }));
     this.ui.updateSonar(
       delta,
       this.maze,
       playerPos,
       this.getPlayerYaw(),
-      monsterPositions,
+      monsterData,
       this.keys,
       teammatePos
     );
@@ -933,6 +1014,7 @@ class Game {
         if (this.isCoopHost && this.monsters.length > 0) {
           const monsterSyncData = this.monsters.map((m, idx) => ({
             id: idx,
+            variant: m.variant,
             x: m.group.position.x,
             y: m.group.position.y,
             z: m.group.position.z,
@@ -1196,7 +1278,7 @@ class Game {
         this.ui.notify('⚠️ YOU ARE DOWNED! Bleeding out in 35s... Wait for teammate revive!', 5000);
       } else {
         this.state = GAME_STATE.GAMEOVER;
-        this.ui.showGameOver(this.elapsedTime, this.keysCount, this.totalKeys, this.currentWorld);
+        this.ui.showGameOver(this.elapsedTime, this.keysCount, this.totalKeys, this.currentWorld, this.killerMonster ? this.killerMonster.name : null);
         if (this.gameMode === 'coop') {
           this.network.send({ type: 'COOP_GAMEOVER' });
         }

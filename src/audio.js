@@ -306,7 +306,7 @@ export class SoundEngine {
   }
 
   // Monster growl / screech
-  playMonsterRoar(distance, isChasing) {
+  playMonsterRoar(distance, isChasing, variant = 0) {
     if (!this.ctx || this.ctx.state !== 'running') return;
     const now = this.ctx.currentTime;
     const maxDist = 50;
@@ -321,7 +321,13 @@ export class SoundEngine {
     osc1.type = 'sawtooth';
     osc2.type = 'sawtooth';
 
-    const baseFreq = isChasing ? 380 : 160;
+    // Variant 1 (Stalker Beta) has a high spectral shriek; Variant 0 (Stalker Alpha) has a low demonic bellow
+    let baseFreq = isChasing ? 380 : 160;
+    if (variant === 1) {
+      baseFreq = isChasing ? 540 : 250;
+    } else if (variant === 0) {
+      baseFreq = isChasing ? 320 : 135;
+    }
     osc1.frequency.setValueAtTime(baseFreq, now);
     osc1.frequency.exponentialRampToValueAtTime(baseFreq * 2.2, now + 0.3);
     osc1.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + 0.9);

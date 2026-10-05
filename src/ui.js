@@ -178,7 +178,7 @@ export class UIController {
     if (this.btnWorld2) {
       this.btnWorld2.classList.remove('locked');
       if (this.w2CardTitle) this.w2CardTitle.textContent = 'WORLD 2';
-      if (this.w2CardSub) this.w2CardSub.textContent = 'THE ABYSSAL CRYPT';
+      if (this.w2CardSub) this.w2CardSub.textContent = 'THE ABYSS (2 STALKERS)';
     }
   }
 
@@ -195,13 +195,13 @@ export class UIController {
 
     if (worldLevel === 2) {
       if (this.titleMainHeader) this.titleMainHeader.textContent = 'THE ABYSSAL CRYPT';
-      if (this.titleSubHeader) this.titleSubHeader.textContent = 'LAIR OF THE ABYSSAL STALKERS';
+      if (this.titleSubHeader) this.titleSubHeader.textContent = 'LAIR OF 2 ABYSSAL STALKERS';
       if (this.titleStoryCard) {
         this.titleStoryCard.innerHTML = `
           You have breached the iron gate and descended into the abyssal underworld.<br>
           Obsidian fissures glow with molten lava, and blood-mist fills the chambers.<br><br>
           <strong>OBJECTIVE:</strong> Recover all <strong>5 Abyssal Relics</strong> and find the <strong>Void Portal</strong>.<br>
-          <strong style="color:#f43f5e;">THREAT:</strong> <em>TWO Abyssal Stalkers</em> hunt in tandem—both are <em>FASTER THAN YOUR NORMAL WALK SPEED</em> and highly resistant to light stuns!
+          <strong style="color:#f43f5e;">THREAT:</strong> <em>TWO Abyssal Stalkers (Alpha & Beta)</em> hunt in tandem—both are <em>FASTER THAN YOUR NORMAL WALK SPEED</em> and highly resistant to light stuns!
           <div class="key-objective-preview" id="key-preview-container">
             <div class="key-preview-item" style="color:#c084fc;">◆ Void Amethyst</div>
             <div class="key-preview-item" style="color:#34d399;">◆ Soul Emerald</div>
@@ -244,7 +244,7 @@ export class UIController {
 
     if (worldLevel === 2) {
       if (this.worldBadge) {
-        this.worldBadge.textContent = 'WORLD 2: THE ABYSS';
+        this.worldBadge.textContent = 'WORLD 2: THE ABYSS (2 STALKERS)';
         this.worldBadge.className = 'world-badge w2';
       }
       if (this.keyLabels[0]) this.keyLabels[0].textContent = 'AMETHYST';
@@ -300,12 +300,14 @@ export class UIController {
     this.pauseScreen.style.display = 'none';
   }
 
-  showGameOver(timeSurvived, keysFound, totalKeys = 3, worldLevel = 1) {
+  showGameOver(timeSurvived, keysFound, totalKeys = 3, worldLevel = 1, killerName = null) {
     this.hideHUD();
     this.statsTimeDead.textContent = this.formatTime(timeSurvived);
     this.statsKeysDead.textContent = `${keysFound} / ${totalKeys}`;
     if (this.deathReason) {
-      if (worldLevel === 2) {
+      if (killerName) {
+        this.deathReason.textContent = `${killerName.toUpperCase()} SHREDDED YOUR SOUL`;
+      } else if (worldLevel === 2) {
         this.deathReason.textContent = 'THE ABYSSAL STALKERS SHREDDED YOUR SOUL';
       } else {
         this.deathReason.textContent = 'THE DREAD WALKER CONSUMED YOUR SOUL';
@@ -470,20 +472,20 @@ export class UIController {
     });
   }
 
-  updateThreat(distance, isChasing) {
+  updateThreat(distance, isChasing, activeMonsterCount = 1, multipleClose = false) {
     let threat = 0;
     let label = 'CLEAR';
 
     if (distance < 38) {
       threat = (38 - distance) / 38;
       if (distance < 12 || isChasing) {
-        label = 'RUN!';
+        label = (activeMonsterCount > 1 && isChasing) ? 'STALKER PURSUIT!' : 'RUN!';
         this.heartIcon.setAttribute('class', 'danger');
       } else if (distance < 22) {
-        label = 'WARNING';
+        label = multipleClose ? 'DOUBLE THREAT • 2 STALKERS!' : (activeMonsterCount > 1 ? 'STALKER DETECTED' : 'WARNING');
         this.heartIcon.setAttribute('class', 'beating');
       } else {
-        label = 'CAUTION';
+        label = (activeMonsterCount > 1) ? '2 STALKERS ACTIVE' : 'CAUTION';
         this.heartIcon.setAttribute('class', 'beating');
       }
     } else {
@@ -525,6 +527,14 @@ export class UIController {
       this.sonarActive = false;
       this.sonarWrapper.style.display = 'none';
       return;
+    }
+
+    if (this.sonarLabel) {
+      if (this.currentWorld === 2) {
+        this.sonarLabel.textContent = 'RADAR SCAN • 2 APEX STALKERS DETECTED (ALPHA & BETA)';
+      } else {
+        this.sonarLabel.textContent = 'RADAR SCAN • 1 APEX STALKER DETECTED';
+      }
     }
 
     if (!this.sonarCtx) return;
@@ -618,12 +628,13 @@ export class UIController {
       }
     }
 
-    // Draw Monster ping(s)
+    // Draw Monster ping(s) with distinct colors and names
     const mPositions = Array.isArray(monsterPositions)
       ? monsterPositions
       : (monsterPositions ? [monsterPositions] : []);
 
-    mPositions.forEach(mPos => {
+    mPositions.forEach((mItem, idx) => {
+      const mPos = (mItem && mItem.pos) ? mItem.pos : mItem;
       if (!mPos) return;
       const mDx = (mPos.x - playerPos.x) / 4.0;
       const mDz = (mPos.z - playerPos.z) / 4.0;
@@ -632,14 +643,31 @@ export class UIController {
       const mDist = Math.hypot(mx - cx, my - cy);
 
       if (mDist < 185) {
-        // Flashing red monster blip
-        ctx.fillStyle = '#ef4444';
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 10;
+        const isBeta = (mItem && mItem.variant === 1) || (this.currentWorld === 2 && idx === 1);
+        const blipColor = isBeta ? '#c084fc' : '#ef4444';
+        const blipName = isBeta ? 'BETA' : (this.currentWorld === 2 ? 'ALPHA' : 'STALKER');
+
+        // Outer pulsing threat aura ring
+        ctx.strokeStyle = blipColor;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.arc(mx, my, 7, 0, Math.PI * 2);
+        const pulseR = 9 + Math.sin(performance.now() * 0.008 + idx * 2.2) * 3;
+        ctx.arc(mx, my, pulseR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner glowing core dot
+        ctx.fillStyle = blipColor;
+        ctx.shadowColor = blipColor;
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(mx, my, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
+
+        // Monospace radar text label next to blip
+        ctx.font = 'bold 10px "Share Tech Mono", monospace';
+        ctx.fillStyle = blipColor;
+        ctx.fillText(blipName, mx + 10, my + 3);
       }
     });
 

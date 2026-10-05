@@ -205,19 +205,53 @@ export class TextureGenerator {
   }
 
   static createAbyssalMonsterSkinTexture() {
+    return this.createCrimsonMonsterSkinTexture();
+  }
+
+  static createCrimsonMonsterSkinTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    // Deep pitch-black charred flesh
-    ctx.fillStyle = '#0c0710';
+    // Deep pitch-black charred flesh with crimson undertone
+    ctx.fillStyle = '#100508';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Glowing bioluminescent violet & crimson veins
-    for (let v = 0; v < 36; v++) {
-      ctx.strokeStyle = Math.random() > 0.4 ? 'rgba(180, 20, 220, 0.8)' : 'rgba(240, 20, 60, 0.85)';
-      ctx.lineWidth = 1.5 + Math.random() * 2;
+    // Glowing molten crimson & scarlet fissures
+    for (let v = 0; v < 38; v++) {
+      ctx.strokeStyle = Math.random() > 0.3 ? 'rgba(255, 20, 60, 0.9)' : 'rgba(255, 90, 20, 0.85)';
+      ctx.lineWidth = 1.5 + Math.random() * 2.5;
+      ctx.beginPath();
+      let vx = Math.random() * 512;
+      let vy = Math.random() * 512;
+      ctx.moveTo(vx, vy);
+      for (let s = 0; s < 5; s++) {
+        vx += (Math.random() - 0.5) * 60;
+        vy += (Math.random() - 0.5) * 60;
+        ctx.lineTo(vx, vy);
+      }
+      ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    return texture;
+  }
+
+  static createVoidMonsterSkinTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Deep pitch-black charred flesh with obsidian amethyst undertone
+    ctx.fillStyle = '#080410';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Glowing spectral violet & electric amethyst fissures
+    for (let v = 0; v < 38; v++) {
+      ctx.strokeStyle = Math.random() > 0.3 ? 'rgba(192, 38, 211, 0.9)' : 'rgba(147, 51, 234, 0.85)';
+      ctx.lineWidth = 1.5 + Math.random() * 2.5;
       ctx.beginPath();
       let vx = Math.random() * 512;
       let vy = Math.random() * 512;
