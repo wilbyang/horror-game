@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Cinzel:wght@600;800;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -775,6 +776,285 @@
       align-items: center;
       gap: 6px;
     }
+
+    /* Game Mode Select (Solo vs Co-op) */
+    .mode-select-group {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 22px;
+      justify-content: center;
+      z-index: 10;
+    }
+    .mode-tab-btn {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 10px 22px;
+      color: #94a3b8;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      letter-spacing: 1px;
+    }
+    .mode-tab-btn:hover {
+      border-color: #38bdf8;
+      color: #f1f5f9;
+      background: rgba(30, 41, 59, 0.85);
+    }
+    .mode-tab-btn.active {
+      background: linear-gradient(135deg, rgba(14, 165, 233, 0.35), rgba(2, 132, 199, 0.2));
+      border-color: #38bdf8;
+      color: #38bdf8;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Co-op Lobby Panel */
+    #coop-lobby-panel {
+      max-width: 580px;
+      width: 100%;
+      margin-bottom: 24px;
+      animation: fadeIn 0.3s ease;
+    }
+    .coop-cards-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+    .coop-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      backdrop-filter: blur(8px);
+      transition: border-color 0.2s;
+    }
+    .coop-card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+    .coop-card-header {
+      font-size: 13px;
+      font-weight: bold;
+      color: #38bdf8;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .coop-card-desc {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    .room-code-display {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: 6px;
+      color: #38bdf8;
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+      margin: 6px 0;
+      background: rgba(2, 6, 23, 0.7);
+      padding: 6px 16px;
+      border-radius: 4px;
+      border: 1px dashed rgba(56, 189, 248, 0.4);
+      min-width: 140px;
+    }
+    .room-input {
+      width: 100%;
+      max-width: 150px;
+      background: rgba(2, 6, 23, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #f1f5f9;
+      text-align: center;
+      outline: none;
+      margin: 6px 0;
+    }
+    .room-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+    }
+    .coop-card-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 100%;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .coop-btn {
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #fff;
+      border: 1px solid #38bdf8;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      max-width: 160px;
+    }
+    .coop-btn:hover {
+      background: #0ea5e9;
+      box-shadow: 0 0 12px rgba(14, 165, 233, 0.6);
+    }
+    .coop-btn-copy {
+      background: rgba(30, 41, 59, 0.8);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 10px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .coop-btn-copy:hover {
+      color: #f1f5f9;
+      border-color: #38bdf8;
+    }
+    .coop-status {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 8px;
+      min-height: 16px;
+    }
+
+    #coop-connected-banner {
+      background: rgba(6, 78, 59, 0.85);
+      border: 1px solid #10b981;
+      border-radius: 6px;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+      margin-top: 8px;
+    }
+    .connected-icon {
+      font-size: 20px;
+    }
+    .connected-text strong {
+      color: #34d399;
+      display: block;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+    .connected-text span {
+      color: #a7f3d0;
+      font-size: 11px;
+    }
+
+    /* Teammate HUD Card */
+    #teammate-hud-card {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #38bdf8;
+      border-radius: 6px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .tm-icon svg {
+      width: 20px;
+      height: 20px;
+      fill: #38bdf8;
+    }
+    .tm-name {
+      font-size: 11px;
+      font-weight: bold;
+      color: #38bdf8;
+      letter-spacing: 1px;
+    }
+    .tm-status {
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    .tm-status.downed {
+      color: #ef4444;
+      font-weight: bold;
+      animation: pulseRed 1s infinite alternate;
+    }
+
+    /* Downed Alert Banner */
+    #downed-banner {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(153, 27, 27, 0.95);
+      border: 2px solid #ef4444;
+      border-radius: 6px;
+      padding: 14px 28px;
+      text-align: center;
+      z-index: 25;
+      pointer-events: none;
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
+      animation: pulseRed 1s infinite alternate;
+    }
+    .downed-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+    .downed-sub {
+      font-size: 12px;
+      color: #fca5a5;
+    }
+
+    /* Revive Prompt */
+    #revive-prompt {
+      position: absolute;
+      bottom: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(14, 165, 233, 0.95);
+      border: 2px solid #38bdf8;
+      border-radius: 6px;
+      padding: 10px 24px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      z-index: 25;
+      pointer-events: none;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.8);
+    }
+
+    @keyframes pulseRed {
+      from { box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+      to { box-shadow: 0 0 28px rgba(239, 68, 68, 0.9); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -884,8 +1164,31 @@
     <div class="controls-hint">
       <span><span class="key-badge">WASD</span> Move</span>
       <span><span class="key-badge">SHIFT</span> Sprint</span>
-      <span><span class="key-badge">F</span> Flashlight (Stun Monster)</span>
-      <span><span class="key-badge">M</span> Echolocation Scan</span>
+      <span><span class="key-badge">F</span> Flashlight</span>
+      <span><span class="key-badge">M</span> Sonar Scan</span>
+      <span><span class="key-badge">Q</span> Ping</span>
+    </div>
+
+    <!-- Teammate Status HUD Card (Co-op) -->
+    <div id="teammate-hud-card" style="display: none;">
+      <div class="tm-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 4a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/></svg>
+      </div>
+      <div class="tm-info">
+        <div class="tm-name" id="tm-hud-name">TEAMMATE</div>
+        <div class="tm-status" id="tm-hud-status">ALIVE • 12m</div>
+      </div>
+    </div>
+
+    <!-- Downed Alert Banner (Co-op) -->
+    <div id="downed-banner" style="display: none;">
+      <div class="downed-title">⚠️ YOU ARE INCAPACITATED ⚠️</div>
+      <div class="downed-sub">Wait for your teammate to revive you! BLEEDOUT: <span id="bleedout-timer">35</span>s</div>
+    </div>
+
+    <!-- Revive Prompt (Co-op) -->
+    <div id="revive-prompt" style="display: none;">
+      <span class="key-badge">HOLD E / STAND CLOSE</span> REVIVE TEAMMATE (<span id="revive-countdown">3.0</span>s)
     </div>
   </div>
 
@@ -897,13 +1200,62 @@
 
   <!-- Title / Start Modal -->
   <div class="modal-screen" id="title-screen">
+    <!-- Game Mode Select (Solo vs Co-op) -->
+    <div class="mode-select-group">
+      <button class="mode-tab-btn active" id="btn-mode-solo">
+        <svg style="width:16px;height:16px;fill:currentColor;" viewBox="0 0 24 24"><path d="M12 4a4 4 0 0 1 4 4 4 4 0 0 1-4 4 4 4 0 0 1-4-4 4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/></svg>
+        <span>SOLO PLAY</span>
+      </button>
+      <button class="mode-tab-btn" id="btn-mode-coop">
+        <svg style="width:16px;height:16px;fill:currentColor;" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5m8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5Z"/></svg>
+        <span>2 PLAYERS (ONLINE CO-OP)</span>
+      </button>
+    </div>
+
+    <!-- Co-op Lobby Panel -->
+    <div id="coop-lobby-panel" style="display: none;">
+      <div class="coop-cards-container">
+        <!-- Host Card -->
+        <div class="coop-card" id="card-host">
+          <div class="coop-card-header">HOST A ROOM</div>
+          <p class="coop-card-desc">Create a room and share the 4-letter code with a friend.</p>
+          <div class="room-code-display" id="host-code-display">----</div>
+          <div class="coop-card-actions">
+            <button class="coop-btn" id="btn-create-room">CREATE ROOM</button>
+            <button class="coop-btn-copy" id="btn-copy-link" style="display: none;">📋 COPY INVITE LINK</button>
+          </div>
+          <div class="coop-status" id="host-status">Click Create Room to generate code</div>
+        </div>
+
+        <!-- Join Card -->
+        <div class="coop-card" id="card-join">
+          <div class="coop-card-header">JOIN A ROOM</div>
+          <p class="coop-card-desc">Enter your friend's 4-letter room code to connect.</p>
+          <input type="text" class="room-input" id="join-room-input" placeholder="CODE" maxlength="6" autocomplete="off" spellcheck="false" />
+          <div class="coop-card-actions">
+            <button class="coop-btn" id="btn-join-room">JOIN ROOM</button>
+          </div>
+          <div class="coop-status" id="join-status">Ready to connect</div>
+        </div>
+      </div>
+
+      <!-- Co-op Connected Banner -->
+      <div id="coop-connected-banner" style="display: none;">
+        <div class="connected-icon">✅</div>
+        <div class="connected-text">
+          <strong id="coop-role-text">TEAMMATE CONNECTED!</strong>
+          <span id="coop-sub-status">Ready to launch co-op expedition.</span>
+        </div>
+      </div>
+    </div>
+
     <div class="world-select-group">
       <button class="world-card-btn active" id="btn-world-1" data-world="1">
         <span class="world-card-title">WORLD 1</span>
         <span class="world-card-sub">THE LABYRINTH</span>
       </button>
-      <button class="world-card-btn w2 locked" id="btn-world-2" data-world="2">
-        <span class="world-card-title" id="w2-card-title">WORLD 2 🔒</span>
+      <button class="world-card-btn w2" id="btn-world-2" data-world="2">
+        <span class="world-card-title" id="w2-card-title">WORLD 2</span>
         <span class="world-card-sub" id="w2-card-sub">THE ABYSSAL CRYPT</span>
       </button>
     </div>
@@ -942,8 +1294,8 @@
       <div><span class="key-badge">SHIFT</span> Sprint (Consumes Stamina)</div>
       <div><span class="key-badge">F / CLICK</span> Toggle Flashlight</div>
       <div><span class="key-badge">M / TAB</span> Echolocation Pulse</div>
-      <div><span class="key-badge">MOUSE</span> Look around</div>
-      <div><span class="key-badge">ESC</span> Pause Game</div>
+      <div><span class="key-badge">Q</span> Quick Ping Teammate</div>
+      <div><span class="key-badge">E</span> Revive Teammate (Co-op)</div>
     </div>
   </div>
 

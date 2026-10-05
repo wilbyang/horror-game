@@ -84,11 +84,65 @@ export class UIController {
     this.jumpscareCanvas = document.getElementById('jumpscare-canvas');
     this.jumpscareCtx = this.jumpscareCanvas ? this.jumpscareCanvas.getContext('2d') : null;
 
+    // Co-op elements
+    this.btnModeSolo = document.getElementById('btn-mode-solo');
+    this.btnModeCoop = document.getElementById('btn-mode-coop');
+    this.coopLobbyPanel = document.getElementById('coop-lobby-panel');
+    this.hostCodeDisplay = document.getElementById('host-code-display');
+    this.btnCreateRoom = document.getElementById('btn-create-room');
+    this.btnCopyLink = document.getElementById('btn-copy-link');
+    this.hostStatus = document.getElementById('host-status');
+    this.joinRoomInput = document.getElementById('join-room-input');
+    this.btnJoinRoom = document.getElementById('btn-join-room');
+    this.joinStatus = document.getElementById('join-status');
+    this.coopConnectedBanner = document.getElementById('coop-connected-banner');
+    this.coopRoleText = document.getElementById('coop-role-text');
+    this.coopSubStatus = document.getElementById('coop-sub-status');
+
+    this.teammateHudCard = document.getElementById('teammate-hud-card');
+    this.tmHudName = document.getElementById('tm-hud-name');
+    this.tmHudStatus = document.getElementById('tm-hud-status');
+    this.downedBanner = document.getElementById('downed-banner');
+    this.bleedoutTimer = document.getElementById('bleedout-timer');
+    this.revivePrompt = document.getElementById('revive-prompt');
+    this.reviveCountdown = document.getElementById('revive-countdown');
+
+    this.selectedMode = 'solo';
     this.selectedDifficulty = 'normal';
     this.selectedWorld = 1;
-    this.isWorld2Unlocked = false;
+    this.isWorld2Unlocked = true; // World 2 unlocked by default for instant access
 
     this.setupDifficultyButtons();
+  }
+
+  setupModeButtons(onModeChange) {
+    if (this.btnModeSolo && this.btnModeCoop) {
+      this.btnModeSolo.addEventListener('click', () => {
+        this.setMode('solo', onModeChange);
+      });
+      this.btnModeCoop.addEventListener('click', () => {
+        this.setMode('coop', onModeChange);
+      });
+    }
+  }
+
+  setMode(mode, callback) {
+    this.selectedMode = mode;
+    if (mode === 'solo') {
+      if (this.btnModeSolo) this.btnModeSolo.classList.add('active');
+      if (this.btnModeCoop) this.btnModeCoop.classList.remove('active');
+      if (this.coopLobbyPanel) this.coopLobbyPanel.style.display = 'none';
+      if (this.startBtn) {
+        this.startBtn.textContent = (this.selectedWorld === 2) ? 'ENTER THE ABYSS' : 'ENTER THE LABYRINTH';
+        this.startBtn.disabled = false;
+        this.startBtn.style.opacity = '1';
+      }
+    } else {
+      if (this.btnModeSolo) this.btnModeSolo.classList.remove('active');
+      if (this.btnModeCoop) this.btnModeCoop.classList.add('active');
+      if (this.coopLobbyPanel) this.coopLobbyPanel.style.display = 'block';
+    }
+    if (callback) callback(mode);
   }
 
   setupDifficultyButtons() {
@@ -109,27 +163,17 @@ export class UIController {
       });
 
       this.btnWorld2.addEventListener('click', () => {
-        if (this.isWorld2Unlocked) {
-          this.selectWorld(2, onWorldChange);
-        } else {
-          this.notify('Survive World 1 to unlock The Abyssal Crypt!', 3000);
-        }
+        this.selectWorld(2, onWorldChange);
       });
     }
   }
 
   updateWorldUnlockState(unlocked) {
-    this.isWorld2Unlocked = unlocked;
+    this.isWorld2Unlocked = true;
     if (this.btnWorld2) {
-      if (unlocked) {
-        this.btnWorld2.classList.remove('locked');
-        if (this.w2CardTitle) this.w2CardTitle.textContent = 'WORLD 2';
-        if (this.w2CardSub) this.w2CardSub.textContent = 'THE ABYSSAL CRYPT';
-      } else {
-        this.btnWorld2.classList.add('locked');
-        if (this.w2CardTitle) this.w2CardTitle.textContent = 'WORLD 2 🔒';
-        if (this.w2CardSub) this.w2CardSub.textContent = 'THE ABYSSAL CRYPT';
-      }
+      this.btnWorld2.classList.remove('locked');
+      if (this.w2CardTitle) this.w2CardTitle.textContent = 'WORLD 2';
+      if (this.w2CardSub) this.w2CardSub.textContent = 'THE ABYSSAL CRYPT';
     }
   }
 
@@ -326,7 +370,7 @@ export class UIController {
     }, duration);
   }
 
-  updateCompass(yawRadians, playerPos = null, keys = [], exitGate = null) {
+  updateCompass(yawRadians, playerPos = null, keys = [], exitGate = null, teammatePos = null) {
     // Convert yaw to 0..360 degrees where 0 = North (-Z), 90 = East (+X)
     let degrees = (yawRadians * (180 / Math.PI)) % 360;
     if (degrees < 0) degrees += 360;
@@ -336,7 +380,7 @@ export class UIController {
     const offset = -30 - (degrees * pxPerDegree);
     this.compassTape.style.transform = `translateX(${offset}px)`;
 
-    // Update floating directional key / exit markers on the compass tape
+    // Update floating directional key / exit / teammate markers on the compass tape
     if (this.compassMarkersContainer && playerPos) {
       let markersHtml = '';
 
@@ -358,6 +402,21 @@ export class UIController {
           }
         }
       });
+
+      // Point to Teammate in Co-op mode
+      if (teammatePos) {
+        const tdx = teammatePos.x - playerPos.x;
+        const tdz = teammatePos.z - playerPos.z;
+        const tAngle = Math.atan2(tdx, -tdz);
+        let diff = tAngle - yawRadians;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+
+        const pxOffset = diff * (180 / Math.PI) * pxPerDegree;
+        if (Math.abs(pxOffset) < 125) {
+          markersHtml += `<div class="compass-key-marker" style="left: calc(50% + ${pxOffset}px); color: #38bdf8; border-color: #38bdf8;">◆ TEAMMATE</div>`;
+        }
+      }
 
       // If all keys collected, point to Exit Gate / Void Portal
       const allCollected = keys.length > 0 && keys.every(k => k.collected);
@@ -449,7 +508,7 @@ export class UIController {
     return true;
   }
 
-  updateSonar(delta, maze, playerPos, playerYaw, monsterPositions, keys) {
+  updateSonar(delta, maze, playerPos, playerYaw, monsterPositions, keys, teammatePos = null) {
     if (this.sonarCooldown > 0) {
       this.sonarCooldown -= delta;
     }
@@ -530,6 +589,30 @@ export class UIController {
     ctx.lineTo(cx + Math.sin(playerYaw) * 16, cy - Math.cos(playerYaw) * 16);
     ctx.stroke();
 
+    // Draw Teammate on sonar in Co-op mode
+    if (teammatePos) {
+      const tDx = (teammatePos.x - playerPos.x) / 4.0;
+      const tDz = (teammatePos.z - playerPos.z) / 4.0;
+      const tx = cx + tDx * scale;
+      const ty = cy + tDz * scale;
+      const tDist = Math.hypot(tx - cx, ty - cy);
+
+      if (tDist < 185) {
+        ctx.fillStyle = '#38bdf8';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(tx, ty, 11, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+    }
+
     // Draw Monster ping(s)
     const mPositions = Array.isArray(monsterPositions)
       ? monsterPositions
@@ -570,6 +653,109 @@ export class UIController {
         }
       }
     });
+  }
+
+  setupCoopButtons(onHost, onJoin, onCopyLink) {
+    if (this.btnCreateRoom) {
+      this.btnCreateRoom.addEventListener('click', () => {
+        if (onHost) onHost();
+      });
+    }
+
+    if (this.btnJoinRoom) {
+      this.btnJoinRoom.addEventListener('click', () => {
+        const code = this.joinRoomInput ? this.joinRoomInput.value.trim().toUpperCase() : '';
+        if (onJoin) onJoin(code);
+      });
+    }
+
+    if (this.joinRoomInput) {
+      this.joinRoomInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const code = this.joinRoomInput.value.trim().toUpperCase();
+          if (onJoin) onJoin(code);
+        }
+      });
+    }
+
+    if (this.btnCopyLink) {
+      this.btnCopyLink.addEventListener('click', () => {
+        if (onCopyLink) onCopyLink();
+      });
+    }
+  }
+
+  setHostCode(code) {
+    if (this.hostCodeDisplay) this.hostCodeDisplay.textContent = code;
+    if (this.btnCopyLink) this.btnCopyLink.style.display = 'inline-block';
+    if (this.hostStatus) this.hostStatus.textContent = 'Room created! Waiting for Player 2 to join...';
+  }
+
+  setHostStatus(text) {
+    if (this.hostStatus) this.hostStatus.textContent = text;
+  }
+
+  setJoinStatus(text) {
+    if (this.joinStatus) this.joinStatus.textContent = text;
+  }
+
+  setCoopConnected(role, isReady) {
+    if (this.coopConnectedBanner) {
+      this.coopConnectedBanner.style.display = isReady ? 'flex' : 'none';
+      if (this.coopRoleText) {
+        this.coopRoleText.textContent = (role === 'host') ? 'PLAYER 2 CONNECTED!' : 'CONNECTED TO HOST!';
+      }
+      if (this.coopSubStatus) {
+        this.coopSubStatus.textContent = (role === 'host') ? 'You are Host. Click Enter to launch co-op!' : 'Waiting for Host to start expedition...';
+      }
+    }
+    if (this.startBtn) {
+      if (role === 'host') {
+        this.startBtn.disabled = !isReady;
+        this.startBtn.style.opacity = isReady ? '1' : '0.5';
+        this.startBtn.textContent = 'ENTER THE LABYRINTH (CO-OP)';
+      } else {
+        this.startBtn.disabled = true;
+        this.startBtn.style.opacity = '0.5';
+        this.startBtn.textContent = isReady ? 'WAITING FOR HOST TO START...' : 'CONNECT TO A ROOM FIRST';
+      }
+    }
+  }
+
+  showTeammateHUD(visible, name = 'TEAMMATE') {
+    if (this.teammateHudCard) {
+      this.teammateHudCard.style.display = visible ? 'flex' : 'none';
+      if (this.tmHudName) this.tmHudName.textContent = name;
+    }
+  }
+
+  updateTeammateHUD(isDowned, dist) {
+    if (!this.tmHudStatus) return;
+    if (isDowned) {
+      this.tmHudStatus.textContent = `DOWNED! • ${Math.round(dist)}m`;
+      this.tmHudStatus.className = 'tm-status downed';
+    } else {
+      this.tmHudStatus.textContent = `ALIVE • ${Math.round(dist)}m`;
+      this.tmHudStatus.className = 'tm-status';
+    }
+  }
+
+  showDownedBanner(visible, remainingSeconds = 35) {
+    if (this.downedBanner) {
+      this.downedBanner.style.display = visible ? 'block' : 'none';
+      if (this.bleedoutTimer) {
+        this.bleedoutTimer.textContent = Math.ceil(remainingSeconds);
+      }
+    }
+  }
+
+  showRevivePrompt(visible, remainingSeconds = 3.0) {
+    if (this.revivePrompt) {
+      this.revivePrompt.style.display = visible ? 'block' : 'none';
+      if (this.reviveCountdown) {
+        this.reviveCountdown.textContent = remainingSeconds.toFixed(1);
+      }
+    }
   }
 
   // Jumpscare Gore Overlay

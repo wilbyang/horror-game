@@ -17,6 +17,8 @@ export class Player {
     this.moveLeft = false;
     this.moveRight = false;
     this.isSprinting = false;
+    this.isDowned = false;
+    this.onQuickPing = null;
 
     // Velocity & physics
     this.velocity = new THREE.Vector3();
@@ -86,6 +88,9 @@ export class Player {
         case 'KeyF':
           this.toggleFlashlight();
           break;
+        case 'KeyQ':
+          if (this.onQuickPing) this.onQuickPing();
+          break;
       }
     };
 
@@ -118,6 +123,22 @@ export class Player {
     window.addEventListener('keyup', onKeyUp);
   }
 
+  setDowned(downed) {
+    this.isDowned = downed;
+    if (downed) {
+      this.moveForward = false;
+      this.moveBackward = false;
+      this.moveLeft = false;
+      this.moveRight = false;
+      this.isSprinting = false;
+      this.camera.position.y = 0.45;
+    } else {
+      this.camera.position.y = this.height;
+      this.stamina = 50;
+      this.isExhausted = false;
+    }
+  }
+
   toggleFlashlight() {
     this.flashlightOn = !this.flashlightOn;
     this.flashlight.visible = this.flashlightOn;
@@ -127,6 +148,7 @@ export class Player {
   }
 
   resetPosition(spawnPos) {
+    this.isDowned = false;
     this.camera.position.set(spawnPos.x, this.height, spawnPos.z);
     this.camera.rotation.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
@@ -137,7 +159,7 @@ export class Player {
   }
 
   update(delta, maze) {
-    if (!this.controls.isLocked) return;
+    if (!this.controls.isLocked || this.isDowned) return;
 
     // Stamina calculation
     const isMoving = this.moveForward || this.moveBackward || this.moveLeft || this.moveRight;

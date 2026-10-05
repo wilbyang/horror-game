@@ -5,6 +5,8 @@ import { Player } from './player.js';
 import { Monster, MONSTER_STATE } from './monster.js';
 import { KeyItem, ExitGate } from './keys.js';
 import { UIController } from './ui.js';
+import { NetworkManager } from './network.js';
+import { RemotePlayer } from './remotePlayer.js';
 
 const GAME_STATE = {
   MENU: 'MENU',
@@ -21,12 +23,19 @@ class Game {
 
     // World & Level tracking
     this.currentWorld = 1;
-    this.unlockedWorld2 = false;
-    try {
-      if (localStorage.getItem('horror_world2_unlocked') === 'true') {
-        this.unlockedWorld2 = true;
-      }
-    } catch (e) {}
+    this.unlockedWorld2 = true; // Unlocked by default!
+
+    // Multiplayer Co-op State
+    this.gameMode = 'solo'; // 'solo' or 'coop'
+    this.network = new NetworkManager();
+    this.remotePlayer = null;
+    this.isCoopHost = false;
+    this.coopConnected = false;
+    this.coopRoomCode = '';
+    this.teammateDowned = false;
+    this.myDownedTimer = 0;
+    this.reviveHoldTimer = 0;
+    this.networkSendTimer = 0;
 
     // Time tracking
     this.lastFrameTime = performance.now();
@@ -46,6 +55,23 @@ class Game {
     this.ui.setupWorldButtons((worldLevel) => {
       this.currentWorld = worldLevel;
     });
+    this.ui.setupModeButtons((mode) => {
+      this.gameMode = mode;
+      if (mode === 'solo') {
+        this.coopConnected = false;
+        this.network.cleanup();
+      }
+    });
+    this.setupCoop();
+
+    // Check URL parameters for ?room=XXXX
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) {
+      this.ui.setMode('coop');
+      if (this.ui.joinRoomInput) this.ui.joinRoomInput.value = roomParam.toUpperCase();
+      setTimeout(() => this.joinCoopRoom(roomParam.toUpperCase()), 300);
+    }
 
     // Three.js Core
     this.container = document.getElementById('canvas-container');
@@ -94,16 +120,29 @@ class Game {
   setupListeners() {
     // Pointer lock change listener
     this.player.controls.addEventListener('lock', () => {
-      if (this.state === GAME_STATE.PAUSED) {
-        this.state = GAME_STATE.PLAYING;
+      if (this.state === GAME_STATE.PAUSED || this.gameMode === 'coop') {
+        if (this.state === GAME_STATE.PAUSED) {
+          this.state = GAME_STATE.PLAYING;
+        }
         this.ui.hidePause();
       }
     });
 
     this.player.controls.addEventListener('unlock', () => {
       if (this.state === GAME_STATE.PLAYING) {
-        this.state = GAME_STATE.PAUSED;
-        this.ui.showPause();
+        if (this.gameMode === 'coop') {
+          this.ui.showPause();
+        } else {
+          this.state = GAME_STATE.PAUSED;
+          this.ui.showPause();
+        }
+      }
+    });
+
+    // Clicking the canvas re-locks controls when playing
+    this.renderer.domElement.addEventListener('click', () => {
+      if (this.state === GAME_STATE.PLAYING && !this.player.controls.isLocked) {
+        this.player.controls.lock();
       }
     });
 
@@ -116,12 +155,209 @@ class Game {
         }
       }
     });
+    this.player.onQuickPing = () => this.handleQuickPing();
+  }
+
+  setupCoop() {
+    this.ui.setupCoopButtons(
+      () => this.createCoopRoom(),
+      (code) => this.joinCoopRoom(code),
+      () => this.copyInviteLink()
+    );
+  }
+
+  createCoopRoom() {
+    const code = NetworkManager.generateRoomCode();
+    this.coopRoomCode = code;
+    this.isCoopHost = true;
+    this.ui.setHostCode(code);
+
+    this.network.hostRoom(code, {
+      onConnected: () => {
+        this.coopConnected = true;
+        this.ui.setCoopConnected('host', true);
+        this.sound.playPingBeacon();
+        this.ui.notify('Player 2 connected! Ready to launch co-op expedition.', 4000);
+      },
+      onDisconnected: () => {
+        this.coopConnected = false;
+        this.ui.setCoopConnected('host', false);
+        this.ui.setHostStatus('Player 2 disconnected.');
+        this.ui.notify('Player 2 disconnected.', 3000);
+      },
+      onMessage: (msg) => this.handleNetworkMessage(msg),
+      onError: (err) => {
+        this.ui.setHostStatus(err);
+      }
+    });
+  }
+
+  joinCoopRoom(code) {
+    if (!code || code.length < 3) {
+      this.ui.setJoinStatus('Please enter a valid room code!');
+      return;
+    }
+    this.coopRoomCode = code;
+    this.isCoopHost = false;
+    this.ui.setJoinStatus(`Connecting to room ${code}...`);
+
+    this.network.joinRoom(code, {
+      onConnected: () => {
+        this.coopConnected = true;
+        this.ui.setCoopConnected('guest', true);
+        this.sound.playPingBeacon();
+        this.ui.notify(`Connected to Host room ${code}! Waiting for Host to start...`, 4500);
+      },
+      onDisconnected: () => {
+        this.coopConnected = false;
+        this.ui.setCoopConnected('guest', false);
+        this.ui.setJoinStatus('Disconnected from Host.');
+        this.ui.notify('Disconnected from Host.', 3000);
+      },
+      onMessage: (msg) => this.handleNetworkMessage(msg),
+      onError: (err) => {
+        this.ui.setJoinStatus(err);
+      }
+    });
+  }
+
+  copyInviteLink() {
+    if (!this.coopRoomCode) return;
+    const url = `${window.location.origin}${window.location.pathname}?room=${this.coopRoomCode}`;
+    navigator.clipboard.writeText(url).then(() => {
+      this.ui.notify('Invite link copied to clipboard!', 3000);
+    }).catch(() => {
+      this.ui.notify(`Share code: ${this.coopRoomCode}`, 3000);
+    });
+  }
+
+  handleQuickPing() {
+    this.sound.playPingBeacon();
+    this.ui.notify('You pinged your location!', 2000);
+    if (this.gameMode === 'coop' && this.network.isConnected) {
+      const pos = this.player.camera.position;
+      this.network.send({ type: 'QUICK_PING', x: pos.x, y: pos.y, z: pos.z });
+    }
+  }
+
+  handleNetworkMessage(msg) {
+    if (!msg || !msg.type) return;
+
+    switch (msg.type) {
+      case 'START_COOP_GAME':
+        this.startCoopGameAsGuest(msg);
+        break;
+
+      case 'PLAYER_MOVE':
+        if (this.remotePlayer) {
+          this.remotePlayer.targetPos.set(msg.x, msg.y, msg.z);
+          this.remotePlayer.targetYaw = msg.yaw;
+          this.remotePlayer.targetPitch = msg.pitch;
+          this.remotePlayer.isSprinting = msg.isSprinting;
+          this.remotePlayer.setFlashlight(msg.flashlightOn);
+          if (msg.isDowned !== undefined) {
+            this.remotePlayer.setDowned(msg.isDowned);
+            this.teammateDowned = msg.isDowned;
+          }
+        }
+        break;
+
+      case 'MONSTER_SYNC':
+        if (!this.isCoopHost && this.monsters.length > 0 && msg.monsters) {
+          msg.monsters.forEach((mData, idx) => {
+            if (this.monsters[idx]) {
+              const m = this.monsters[idx];
+              m.group.position.set(mData.x, mData.y, mData.z);
+              m.group.rotation.y = mData.rotY;
+              m.state = mData.state;
+              m.animateMovement(0.016, (mData.state === 'CHASE' ? m.chaseSpeed : m.patrolSpeed));
+            }
+          });
+        }
+        break;
+
+      case 'KEY_COLLECTED':
+        this.handleRemoteKeyPickup(msg.keyId);
+        break;
+
+      case 'REVIVE_TEAMMATE':
+        this.player.setDowned(false);
+        this.myDownedTimer = 0;
+        this.ui.showDownedBanner(false);
+        this.sound.playReviveSound();
+        this.ui.notify('Your teammate revived you with adrenaline!', 4000);
+        break;
+
+      case 'DOWNED_ALERT':
+        this.teammateDowned = true;
+        if (this.remotePlayer) this.remotePlayer.setDowned(true);
+        this.sound.playTeammateDowned();
+        this.ui.notify('⚠️ TEAMMATE DOWNED! Reach their location to revive them!', 5000);
+        break;
+
+      case 'QUICK_PING':
+        this.sound.playPingBeacon();
+        this.ui.notify('Teammate pinged nearby!', 2500);
+        break;
+
+      case 'COOP_VICTORY':
+        this.triggerVictory();
+        break;
+
+      case 'COOP_GAMEOVER':
+        this.state = GAME_STATE.GAMEOVER;
+        this.ui.hideHUD();
+        this.ui.showGameOver(this.elapsedTime, this.keysCount, this.totalKeys, this.currentWorld);
+        break;
+    }
+  }
+
+  handleRemoteKeyPickup(keyId) {
+    const key = this.keys.find(k => k.id === keyId);
+    if (key && !key.collected) {
+      key.collected = true;
+      this.scene.remove(key.group);
+      this.collectedKeys[key.id] = true;
+      this.keysCount++;
+
+      this.sound.playKeyPickup();
+      this.ui.updateKeys(this.collectedKeys);
+      this.exitGate.insertKey(key.id);
+      this.ui.notify(`Teammate acquired ${key.name} (${this.keysCount}/${this.totalKeys})!`, 4000);
+
+      // Alert all monsters
+      if (this.isCoopHost) {
+        this.monsters.forEach(m => m.hearNoise(this.player.camera.position));
+      }
+
+      // Check gate unlock
+      if (this.keysCount === this.totalKeys) {
+        setTimeout(() => {
+          this.sound.playGateUnlocked();
+          this.exitGate.unlock();
+          const unlockMsg = (this.currentWorld === 2)
+            ? 'ALL 5 RELICS ACQUIRED! VOID PORTAL ACTIVE! ESCAPE TOGETHER!'
+            : 'ALL 3 KEYS ACQUIRED! SOUTH EXIT GATE UNLOCKED! ESCAPE TOGETHER!';
+          this.ui.notify(unlockMsg, 6000);
+        }, 800);
+      }
+    }
   }
 
   bindButtons() {
     // Start Game Button
     const startBtn = document.getElementById('start-btn');
     startBtn.addEventListener('click', () => {
+      if (this.gameMode === 'coop') {
+        if (!this.isCoopHost) {
+          this.ui.notify('Waiting for Host to launch the game!', 3000);
+          return;
+        }
+        if (!this.coopConnected) {
+          this.ui.notify('Waiting for Player 2 to join before starting!', 3500);
+          return;
+        }
+      }
       this.sound.init();
       this.startNewGame(this.currentWorld);
     });
@@ -129,6 +365,10 @@ class Game {
     // Retry Button
     const retryBtn = document.getElementById('retry-btn');
     retryBtn.addEventListener('click', () => {
+      if (this.gameMode === 'coop' && !this.isCoopHost) {
+        this.ui.notify('Only the Host can restart the co-op session!', 3000);
+        return;
+      }
       this.sound.resume();
       this.startNewGame(this.currentWorld);
     });
@@ -136,6 +376,10 @@ class Game {
     // Play Again Button (Replay active world)
     const playagainBtn = document.getElementById('playagain-btn');
     playagainBtn.addEventListener('click', () => {
+      if (this.gameMode === 'coop' && !this.isCoopHost) {
+        this.ui.notify('Only the Host can start the next game!', 3000);
+        return;
+      }
       this.sound.resume();
       this.startNewGame(this.currentWorld);
     });
@@ -144,6 +388,10 @@ class Game {
     const enterWorld2Btn = document.getElementById('btn-enter-world2');
     if (enterWorld2Btn) {
       enterWorld2Btn.addEventListener('click', () => {
+        if (this.gameMode === 'coop' && !this.isCoopHost) {
+          this.ui.notify('Only the Host can select the next world!', 3000);
+          return;
+        }
         this.sound.resume();
         this.currentWorld = 2;
         this.ui.selectWorld(2);
@@ -206,9 +454,19 @@ class Game {
     if (this.exitGate) this.scene.remove(this.exitGate.group);
     this.keys.forEach(k => this.scene.remove(k.group));
     this.keys = [];
+    if (this.remotePlayer) {
+      this.remotePlayer.destroy();
+      this.remotePlayer = null;
+    }
 
     // Reset game state
     this.ui.hideJumpscareOverlay();
+    this.player.setDowned(false);
+    this.teammateDowned = false;
+    this.myDownedTimer = 0;
+    this.reviveHoldTimer = 0;
+    this.ui.showDownedBanner(false);
+    this.ui.showRevivePrompt(false);
     this.collectedKeys = {};
     this.keysCount = 0;
     this.totalKeys = (this.currentWorld === 2) ? 5 : 3;
@@ -245,7 +503,30 @@ class Game {
     });
 
     // Position Player at Spawn Safe Room
-    this.player.resetPosition(this.maze.spawnPos);
+    const spawnX = (this.gameMode === 'coop') ? this.maze.spawnPos.x - 1.2 : this.maze.spawnPos.x;
+    this.player.resetPosition(new THREE.Vector3(spawnX, this.maze.spawnPos.y, this.maze.spawnPos.z));
+
+    if (this.gameMode === 'coop') {
+      const remoteX = this.maze.spawnPos.x + 1.2;
+      this.remotePlayer = new RemotePlayer(this.scene, this.sound, 'PLAYER 2');
+      this.remotePlayer.group.position.set(remoteX, 0, this.maze.spawnPos.z);
+      this.remotePlayer.targetPos.set(remoteX, 0, this.maze.spawnPos.z);
+      this.ui.showTeammateHUD(true, 'PLAYER 2');
+
+      // Send maze layout to Guest
+      this.network.send({
+        type: 'START_COOP_GAME',
+        worldLevel: this.currentWorld,
+        difficulty: this.ui.selectedDifficulty,
+        mazeSize: this.maze.size,
+        mazeGrid: this.maze.grid,
+        keyPositions: this.maze.keyPositions,
+        exitPos: { x: this.maze.exitPos.x, y: this.maze.exitPos.y, z: this.maze.exitPos.z },
+        spawnPos: { x: this.maze.spawnPos.x, y: this.maze.spawnPos.y, z: this.maze.spawnPos.z }
+      });
+    } else {
+      this.ui.showTeammateHUD(false);
+    }
 
     // Spawn Monsters: World 1 has 1 Dread Walker; World 2 has 2 Abyssal Stalkers!
     const monsterCount = (this.currentWorld === 2) ? 2 : 1;
@@ -307,6 +588,113 @@ class Game {
     this.player.controls.lock();
   }
 
+  startCoopGameAsGuest(data) {
+    this.currentWorld = data.worldLevel;
+    this.ui.selectedDifficulty = data.difficulty;
+
+    // Apply World-specific Atmosphere & Lighting
+    if (this.currentWorld === 2) {
+      this.scene.background.setHex(0x140409);
+      this.scene.fog.color.setHex(0x140409);
+      this.scene.fog.density = 0.024;
+      this.ambientLight.color.setHex(0x3d101c);
+      this.ambientLight.intensity = 1.35;
+      this.hemiLight.color.setHex(0x4a1420);
+      this.hemiLight.groundColor.setHex(0x1a060b);
+      this.hemiLight.intensity = 0.9;
+    } else {
+      this.scene.background.setHex(0x0a0c16);
+      this.scene.fog.color.setHex(0x0c0f1a);
+      this.scene.fog.density = 0.022;
+      this.ambientLight.color.setHex(0x2a3248);
+      this.ambientLight.intensity = 1.2;
+      this.hemiLight.color.setHex(0x3d4963);
+      this.hemiLight.groundColor.setHex(0x1e2029);
+      this.hemiLight.intensity = 0.85;
+    }
+
+    // Clear previous entities
+    if (this.maze) this.scene.remove(this.maze.group);
+    if (this.monsters) this.monsters.forEach(m => this.scene.remove(m.group));
+    this.monsters = [];
+    this.killerMonster = null;
+    if (this.exitGate) this.scene.remove(this.exitGate.group);
+    this.keys.forEach(k => this.scene.remove(k.group));
+    this.keys = [];
+    if (this.remotePlayer) {
+      this.remotePlayer.destroy();
+      this.remotePlayer = null;
+    }
+
+    // Reset game state
+    this.ui.hideJumpscareOverlay();
+    this.player.setDowned(false);
+    this.teammateDowned = false;
+    this.myDownedTimer = 0;
+    this.reviveHoldTimer = 0;
+    this.ui.showDownedBanner(false);
+    this.ui.showRevivePrompt(false);
+    this.collectedKeys = {};
+    this.keysCount = 0;
+    this.totalKeys = (this.currentWorld === 2) ? 5 : 3;
+    this.ui.setWorld(this.currentWorld);
+    this.ui.updateKeys(this.collectedKeys);
+
+    // Build Maze from Host's exact grid
+    this.maze = new Maze(data.mazeSize, this.currentWorld);
+    this.maze.grid = data.mazeGrid;
+    this.maze.exitPos = new THREE.Vector3(data.exitPos.x, data.exitPos.y, data.exitPos.z);
+    this.maze.spawnPos = new THREE.Vector3(data.spawnPos.x, data.spawnPos.y, data.spawnPos.z);
+    this.maze.keyPositions = data.keyPositions;
+    this.maze.build3DWorld(this.scene);
+
+    // Setup Exit Gate
+    this.exitGate = new ExitGate(this.maze.exitPos, this.currentWorld);
+    this.scene.add(this.exitGate.group);
+
+    // Spawn Keys
+    this.keys = this.maze.keyPositions.map(info => {
+      const keyItem = new KeyItem(info);
+      this.scene.add(keyItem.group);
+      return keyItem;
+    });
+
+    // Position Guest Player at Spawn
+    const guestPos = new THREE.Vector3(data.spawnPos.x + 1.2, this.maze.spawnPos.y, data.spawnPos.z);
+    this.player.resetPosition(guestPos);
+
+    // Spawn Host Remote Player
+    const hostSpawn = new THREE.Vector3(data.spawnPos.x - 1.2, 0, data.spawnPos.z);
+    this.remotePlayer = new RemotePlayer(this.scene, this.sound, 'HOST (P1)');
+    this.remotePlayer.group.position.copy(hostSpawn);
+    this.remotePlayer.targetPos.copy(hostSpawn);
+    this.ui.showTeammateHUD(true, 'HOST (P1)');
+
+    // Visual Monsters (Guest follows Host updates)
+    const monsterCount = (this.currentWorld === 2) ? 2 : 1;
+    this.monsters = [];
+    for (let i = 0; i < monsterCount; i++) {
+      const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
+      this.monsters.push(monster);
+    }
+
+    // Hide modals and show HUD
+    this.ui.titleScreen.style.display = 'none';
+    this.ui.gameoverScreen.style.display = 'none';
+    this.ui.victoryScreen.style.display = 'none';
+    this.ui.pauseScreen.style.display = 'none';
+    this.ui.showHUD();
+
+    this.sound.resume();
+    this.ui.notify('CO-OP EXPEDITION LAUNCHED! Stay close and find all keys!', 5000);
+
+    this.lastFrameTime = performance.now();
+    this.gameTotalTime = 0;
+    this.elapsedTime = 0;
+    this.state = GAME_STATE.PLAYING;
+    this.player.controls.lock();
+  }
+
   spawnMonsterFarAway(monster) {
     // Find an open walkable spot in the maze distant from player spawn and any already-spawned monster
     let bestDist = 0;
@@ -340,12 +728,16 @@ class Game {
 
   triggerSonarPulse() {
     const monsterPositions = this.monsters.map(m => m.group.position);
+    const teammatePos = (this.gameMode === 'coop' && this.remotePlayer)
+      ? this.remotePlayer.group.position
+      : null;
     const success = this.ui.triggerSonar(
       this.maze,
       this.player.camera.position,
       this.getPlayerYaw(),
       monsterPositions,
-      this.keys
+      this.keys,
+      teammatePos
     );
     if (success) {
       this.sound.playSonarPing();
@@ -450,10 +842,13 @@ class Game {
       this.player.isExhausted,
       this.player.battery
     );
-    // Update Compass with directional key markers & exit marker
-    this.ui.updateCompass(this.getPlayerYaw(), playerPos, this.keys, this.exitGate);
+    // Update Compass with directional key markers, exit marker, and teammate marker
+    const teammatePos = (this.gameMode === 'coop' && this.remotePlayer)
+      ? this.remotePlayer.group.position
+      : null;
+    this.ui.updateCompass(this.getPlayerYaw(), playerPos, this.keys, this.exitGate, teammatePos);
 
-    // Update Sonar Radar with all monster positions
+    // Update Sonar Radar with all monster positions & teammate
     const monsterPositions = this.monsters.map(m => m.group.position);
     this.ui.updateSonar(
       delta,
@@ -461,11 +856,90 @@ class Game {
       playerPos,
       this.getPlayerYaw(),
       monsterPositions,
-      this.keys
+      this.keys,
+      teammatePos
     );
 
+    // Network synchronization in Co-op mode
+    if (this.gameMode === 'coop' && this.network.isConnected) {
+      this.networkSendTimer += delta;
+      if (this.networkSendTimer >= 0.033) {
+        this.networkSendTimer = 0;
+        const pCam = this.player.camera;
+        this.network.send({
+          type: 'PLAYER_MOVE',
+          x: pCam.position.x,
+          y: pCam.position.y,
+          z: pCam.position.z,
+          yaw: this.getPlayerYaw(),
+          pitch: pCam.rotation.x,
+          isSprinting: this.player.isSprinting,
+          flashlightOn: this.player.flashlightOn,
+          battery: this.player.battery,
+          isDowned: this.player.isDowned
+        });
+
+        // Host synchronizes monster states
+        if (this.isCoopHost && this.monsters.length > 0) {
+          const monsterSyncData = this.monsters.map((m, idx) => ({
+            id: idx,
+            x: m.group.position.x,
+            y: m.group.position.y,
+            z: m.group.position.z,
+            rotY: m.group.rotation.y,
+            state: m.state
+          }));
+          this.network.send({ type: 'MONSTER_SYNC', monsters: monsterSyncData });
+        }
+      }
+
+      // Update Remote Player
+      if (this.remotePlayer) {
+        this.remotePlayer.update(delta, playerPos);
+        const distToTm = this.remotePlayer.group.position.distanceTo(playerPos);
+        this.ui.updateTeammateHUD(this.teammateDowned, distToTm);
+
+        // Reviving Teammate Check
+        if (this.teammateDowned && !this.player.isDowned) {
+          if (distToTm < 2.8) {
+            this.reviveHoldTimer += delta;
+            this.ui.showRevivePrompt(true, Math.max(0, 3.0 - this.reviveHoldTimer));
+            if (this.reviveHoldTimer >= 3.0) {
+              this.reviveHoldTimer = 0;
+              this.teammateDowned = false;
+              this.remotePlayer.setDowned(false);
+              this.sound.playReviveSound();
+              this.network.send({ type: 'REVIVE_TEAMMATE' });
+              this.ui.showRevivePrompt(false);
+              this.ui.notify('You revived your teammate!', 3500);
+            }
+          } else {
+            this.reviveHoldTimer = 0;
+            this.ui.showRevivePrompt(false);
+          }
+        } else {
+          this.reviveHoldTimer = 0;
+          this.ui.showRevivePrompt(false);
+        }
+      }
+
+      // Local player Downed Bleed-out Countdown
+      if (this.player.isDowned) {
+        this.myDownedTimer -= delta;
+        this.ui.showDownedBanner(true, this.myDownedTimer);
+        if (this.myDownedTimer <= 0) {
+          this.network.send({ type: 'COOP_GAMEOVER' });
+          this.state = GAME_STATE.GAMEOVER;
+          this.ui.hideHUD();
+          this.ui.showGameOver(this.elapsedTime, this.keysCount, this.totalKeys, this.currentWorld);
+        }
+      } else {
+        this.ui.showDownedBanner(false);
+      }
+    }
+
     // Catch / Jumpscare check
-    if (caughtByMonster) {
+    if (caughtByMonster && !this.player.isDowned) {
       this.triggerGameOverCatch(caughtByMonster);
     }
   }
@@ -501,6 +975,10 @@ class Game {
           this.exitGate.insertKey(key.id);
 
           this.ui.notify(`Acquired ${key.name} (${this.keysCount}/${this.totalKeys})!`);
+
+          if (this.gameMode === 'coop') {
+            this.network.send({ type: 'KEY_COLLECTED', keyId: key.id });
+          }
 
           // All monsters hear the key pickup disturbance!
           this.monsters.forEach(m => m.hearNoise(playerPos));
@@ -638,18 +1116,53 @@ class Game {
     // 2. Render 2D arterial gore, claw scratches & blood drip overlay
     this.ui.renderJumpscareGore(progress);
 
-    // 3. Complete kill & transition to Game Over
+    // 3. Complete kill & transition to Game Over or Co-op Downed
     if (progress >= 1.0) {
-      this.state = GAME_STATE.GAMEOVER;
       this.ui.hideJumpscareOverlay();
-      this.ui.showGameOver(this.elapsedTime, this.keysCount, this.totalKeys, this.currentWorld);
+
+      if (this.gameMode === 'coop' && this.remotePlayer && !this.teammateDowned) {
+        // Co-op: enter downed state instead of game over, allowing teammate to revive!
+        this.state = GAME_STATE.PLAYING;
+        this.ui.showHUD();
+        this.player.setDowned(true);
+        this.myDownedTimer = 35;
+        this.sound.playTeammateDowned();
+
+        // Broadcast to teammate that we are downed
+        this.network.send({
+          type: 'DOWNED_ALERT',
+          position: [this.player.camera.position.x, this.player.camera.position.y, this.player.camera.position.z]
+        });
+
+        // Repel the monster so it doesn't continuously body-block the downed player
+        if (monster && monster.group) {
+          monster.state = MONSTER_STATE.PATROL;
+          monster.speed = monster.patrolSpeed || monster.baseSpeed || 1.8;
+          const away = new THREE.Vector3().subVectors(monster.group.position, this.camera.position).normalize();
+          if (away.lengthSq() < 0.01) away.set(1, 0, 0);
+          monster.group.position.addScaledVector(away, 14.0);
+        }
+
+        this.ui.notify('⚠️ YOU ARE DOWNED! Bleeding out in 35s... Wait for teammate revive!', 5000);
+      } else {
+        this.state = GAME_STATE.GAMEOVER;
+        this.ui.showGameOver(this.elapsedTime, this.keysCount, this.totalKeys, this.currentWorld);
+        if (this.gameMode === 'coop') {
+          this.network.send({ type: 'COOP_GAMEOVER' });
+        }
+      }
     }
   }
 
   triggerVictory() {
+    if (this.state === GAME_STATE.VICTORY) return;
     this.state = GAME_STATE.VICTORY;
     this.player.controls.unlock();
     this.sound.playVictory();
+
+    if (this.gameMode === 'coop') {
+      this.network.send({ type: 'COOP_VICTORY' });
+    }
 
     if (this.currentWorld === 1) {
       this.unlockedWorld2 = true;
