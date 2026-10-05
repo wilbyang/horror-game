@@ -7,7 +7,9 @@ export class KeyItem {
     this.id = info.id;
     this.name = info.name;
     this.colorHex = info.color;
-    this.pos = info.pos.clone();
+    this.pos = (info.pos && typeof info.pos.clone === 'function')
+      ? info.pos.clone()
+      : new THREE.Vector3(info.pos.x, info.pos.y || 0, info.pos.z);
     this.pos.y = 1.3; // Floating waist height
 
     this.collected = false;
@@ -119,7 +121,9 @@ export class KeyItem {
 
 export class ExitGate {
   constructor(exitPos, worldLevel = 1) {
-    this.pos = exitPos.clone();
+    this.pos = (exitPos && typeof exitPos.clone === 'function')
+      ? exitPos.clone()
+      : new THREE.Vector3(exitPos.x, exitPos.y || 0, exitPos.z);
     this.worldLevel = worldLevel;
     this.group = new THREE.Group();
     this.group.position.copy(this.pos);

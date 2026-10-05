@@ -139,10 +139,13 @@ class Game {
       }
     });
 
-    // Clicking the canvas re-locks controls when playing
-    this.renderer.domElement.addEventListener('click', () => {
+    // Clicking anywhere on the screen locks controls when playing
+    window.addEventListener('click', (e) => {
       if (this.state === GAME_STATE.PLAYING && !this.player.controls.isLocked) {
-        this.player.controls.lock();
+        if (e.target && (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT')) return;
+        try {
+          this.player.controls.lock();
+        } catch (err) {}
       }
     });
 
@@ -527,17 +530,27 @@ class Game {
       this.remotePlayer.targetPos.set(remoteX, 0, this.maze.spawnPos.z);
       this.ui.showTeammateHUD(true, 'PLAYER 2');
 
-      // Send maze layout to Guest
-      this.network.send({
+      // Send maze layout to Guest with robust serialization and redundancy
+      const coopStartPacket = {
         type: 'START_COOP_GAME',
         worldLevel: this.currentWorld,
         difficulty: this.ui.selectedDifficulty,
         mazeSize: this.maze.size,
         mazeGrid: this.maze.grid,
-        keyPositions: this.maze.keyPositions,
+        keyPositions: this.maze.keyPositions.map(k => ({
+          id: k.id,
+          name: k.name,
+          color: k.color,
+          grid: k.grid,
+          pos: { x: k.pos.x, y: k.pos.y, z: k.pos.z }
+        })),
         exitPos: { x: this.maze.exitPos.x, y: this.maze.exitPos.y, z: this.maze.exitPos.z },
         spawnPos: { x: this.maze.spawnPos.x, y: this.maze.spawnPos.y, z: this.maze.spawnPos.z }
-      });
+      };
+
+      this.network.send(coopStartPacket);
+      setTimeout(() => this.network.send(coopStartPacket), 250);
+      setTimeout(() => this.network.send(coopStartPacket), 600);
     } else {
       this.ui.showTeammateHUD(false);
     }
@@ -603,110 +616,132 @@ class Game {
   }
 
   startCoopGameAsGuest(data) {
-    this.currentWorld = data.worldLevel;
-    this.ui.selectedDifficulty = data.difficulty;
+    if (!data) return;
+    try {
+      if (this.state === GAME_STATE.PLAYING && this.hasStartedCoopGame) {
+        return;
+      }
+      this.hasStartedCoopGame = true;
 
-    // Apply World-specific Atmosphere & Lighting
-    if (this.currentWorld === 2) {
-      this.scene.background.setHex(0x140409);
-      this.scene.fog.color.setHex(0x140409);
-      this.scene.fog.density = 0.024;
-      this.ambientLight.color.setHex(0x3d101c);
-      this.ambientLight.intensity = 1.35;
-      this.hemiLight.color.setHex(0x4a1420);
-      this.hemiLight.groundColor.setHex(0x1a060b);
-      this.hemiLight.intensity = 0.9;
-    } else {
-      this.scene.background.setHex(0x0a0c16);
-      this.scene.fog.color.setHex(0x0c0f1a);
-      this.scene.fog.density = 0.022;
-      this.ambientLight.color.setHex(0x2a3248);
-      this.ambientLight.intensity = 1.2;
-      this.hemiLight.color.setHex(0x3d4963);
-      this.hemiLight.groundColor.setHex(0x1e2029);
-      this.hemiLight.intensity = 0.85;
+      this.currentWorld = data.worldLevel || 1;
+      this.ui.selectedDifficulty = data.difficulty || 'normal';
+
+      // Apply World-specific Atmosphere & Lighting
+      if (this.currentWorld === 2) {
+        this.scene.background.setHex(0x140409);
+        this.scene.fog.color.setHex(0x140409);
+        this.scene.fog.density = 0.024;
+        this.ambientLight.color.setHex(0x3d101c);
+        this.ambientLight.intensity = 1.35;
+        this.hemiLight.color.setHex(0x4a1420);
+        this.hemiLight.groundColor.setHex(0x1a060b);
+        this.hemiLight.intensity = 0.9;
+      } else {
+        this.scene.background.setHex(0x0a0c16);
+        this.scene.fog.color.setHex(0x0c0f1a);
+        this.scene.fog.density = 0.022;
+        this.ambientLight.color.setHex(0x2a3248);
+        this.ambientLight.intensity = 1.2;
+        this.hemiLight.color.setHex(0x3d4963);
+        this.hemiLight.groundColor.setHex(0x1e2029);
+        this.hemiLight.intensity = 0.85;
+      }
+
+      // Clear previous entities
+      if (this.maze) this.scene.remove(this.maze.group);
+      if (this.monsters) this.monsters.forEach(m => this.scene.remove(m.group));
+      this.monsters = [];
+      this.killerMonster = null;
+      if (this.exitGate) this.scene.remove(this.exitGate.group);
+      this.keys.forEach(k => this.scene.remove(k.group));
+      this.keys = [];
+      if (this.remotePlayer) {
+        this.remotePlayer.destroy();
+        this.remotePlayer = null;
+      }
+
+      // Reset game state
+      this.ui.hideJumpscareOverlay();
+      this.player.setDowned(false);
+      this.teammateDowned = false;
+      this.myDownedTimer = 0;
+      this.reviveHoldTimer = 0;
+      this.ui.showDownedBanner(false);
+      this.ui.showRevivePrompt(false);
+      this.collectedKeys = {};
+      this.keysCount = 0;
+      this.totalKeys = (this.currentWorld === 2) ? 5 : 3;
+      this.ui.setWorld(this.currentWorld);
+      this.ui.updateKeys(this.collectedKeys);
+
+      // Build Maze from Host's exact grid
+      this.maze = new Maze(data.mazeSize, this.currentWorld);
+      this.maze.grid = data.mazeGrid;
+      this.maze.exitPos = new THREE.Vector3(data.exitPos.x, data.exitPos.y, data.exitPos.z);
+      this.maze.spawnPos = new THREE.Vector3(data.spawnPos.x, data.spawnPos.y, data.spawnPos.z);
+      this.maze.keyPositions = (data.keyPositions || []).map(info => ({
+        id: info.id,
+        name: info.name,
+        color: info.color,
+        grid: info.grid,
+        pos: new THREE.Vector3(info.pos.x, info.pos.y || 0, info.pos.z)
+      }));
+      this.maze.build3DWorld(this.scene);
+
+      // Setup Exit Gate
+      this.exitGate = new ExitGate(this.maze.exitPos, this.currentWorld);
+      this.scene.add(this.exitGate.group);
+
+      // Spawn Keys
+      this.keys = this.maze.keyPositions.map(info => {
+        const keyItem = new KeyItem(info);
+        this.scene.add(keyItem.group);
+        return keyItem;
+      });
+
+      // Position Guest Player at Spawn
+      const guestPos = new THREE.Vector3(data.spawnPos.x + 1.2, this.maze.spawnPos.y, data.spawnPos.z);
+      this.player.resetPosition(guestPos);
+
+      // Spawn Host Remote Player
+      const hostSpawn = new THREE.Vector3(data.spawnPos.x - 1.2, 0, data.spawnPos.z);
+      this.remotePlayer = new RemotePlayer(this.scene, this.sound, 'HOST (P1)');
+      this.remotePlayer.group.position.copy(hostSpawn);
+      this.remotePlayer.targetPos.copy(hostSpawn);
+      this.ui.showTeammateHUD(true, 'HOST (P1)');
+
+      // Visual Monsters (Guest follows Host updates)
+      const monsterCount = (this.currentWorld === 2) ? 2 : 1;
+      this.monsters = [];
+      for (let i = 0; i < monsterCount; i++) {
+        const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
+        this.monsters.push(monster);
+      }
+
+      // Hide modals and show HUD
+      this.ui.titleScreen.style.display = 'none';
+      this.ui.gameoverScreen.style.display = 'none';
+      this.ui.victoryScreen.style.display = 'none';
+      this.ui.pauseScreen.style.display = 'none';
+      this.ui.showHUD();
+
+      this.sound.resume();
+      this.ui.notify('CO-OP EXPEDITION LAUNCHED! Stay close and find all keys!', 5000);
+
+      this.lastFrameTime = performance.now();
+      this.gameTotalTime = 0;
+      this.elapsedTime = 0;
+      this.state = GAME_STATE.PLAYING;
+
+      try {
+        this.player.controls.lock();
+      } catch (e) {
+        console.log('[PointerLock] Awaiting user click to lock pointer');
+      }
+    } catch (err) {
+      console.error('[Co-op] Failed to start game as guest:', err);
+      this.ui.notify('Error starting co-op: ' + err.message, 5000);
     }
-
-    // Clear previous entities
-    if (this.maze) this.scene.remove(this.maze.group);
-    if (this.monsters) this.monsters.forEach(m => this.scene.remove(m.group));
-    this.monsters = [];
-    this.killerMonster = null;
-    if (this.exitGate) this.scene.remove(this.exitGate.group);
-    this.keys.forEach(k => this.scene.remove(k.group));
-    this.keys = [];
-    if (this.remotePlayer) {
-      this.remotePlayer.destroy();
-      this.remotePlayer = null;
-    }
-
-    // Reset game state
-    this.ui.hideJumpscareOverlay();
-    this.player.setDowned(false);
-    this.teammateDowned = false;
-    this.myDownedTimer = 0;
-    this.reviveHoldTimer = 0;
-    this.ui.showDownedBanner(false);
-    this.ui.showRevivePrompt(false);
-    this.collectedKeys = {};
-    this.keysCount = 0;
-    this.totalKeys = (this.currentWorld === 2) ? 5 : 3;
-    this.ui.setWorld(this.currentWorld);
-    this.ui.updateKeys(this.collectedKeys);
-
-    // Build Maze from Host's exact grid
-    this.maze = new Maze(data.mazeSize, this.currentWorld);
-    this.maze.grid = data.mazeGrid;
-    this.maze.exitPos = new THREE.Vector3(data.exitPos.x, data.exitPos.y, data.exitPos.z);
-    this.maze.spawnPos = new THREE.Vector3(data.spawnPos.x, data.spawnPos.y, data.spawnPos.z);
-    this.maze.keyPositions = data.keyPositions;
-    this.maze.build3DWorld(this.scene);
-
-    // Setup Exit Gate
-    this.exitGate = new ExitGate(this.maze.exitPos, this.currentWorld);
-    this.scene.add(this.exitGate.group);
-
-    // Spawn Keys
-    this.keys = this.maze.keyPositions.map(info => {
-      const keyItem = new KeyItem(info);
-      this.scene.add(keyItem.group);
-      return keyItem;
-    });
-
-    // Position Guest Player at Spawn
-    const guestPos = new THREE.Vector3(data.spawnPos.x + 1.2, this.maze.spawnPos.y, data.spawnPos.z);
-    this.player.resetPosition(guestPos);
-
-    // Spawn Host Remote Player
-    const hostSpawn = new THREE.Vector3(data.spawnPos.x - 1.2, 0, data.spawnPos.z);
-    this.remotePlayer = new RemotePlayer(this.scene, this.sound, 'HOST (P1)');
-    this.remotePlayer.group.position.copy(hostSpawn);
-    this.remotePlayer.targetPos.copy(hostSpawn);
-    this.ui.showTeammateHUD(true, 'HOST (P1)');
-
-    // Visual Monsters (Guest follows Host updates)
-    const monsterCount = (this.currentWorld === 2) ? 2 : 1;
-    this.monsters = [];
-    for (let i = 0; i < monsterCount; i++) {
-      const monster = new Monster(this.scene, this.maze, this.sound, this.currentWorld === 2);
-      this.monsters.push(monster);
-    }
-
-    // Hide modals and show HUD
-    this.ui.titleScreen.style.display = 'none';
-    this.ui.gameoverScreen.style.display = 'none';
-    this.ui.victoryScreen.style.display = 'none';
-    this.ui.pauseScreen.style.display = 'none';
-    this.ui.showHUD();
-
-    this.sound.resume();
-    this.ui.notify('CO-OP EXPEDITION LAUNCHED! Stay close and find all keys!', 5000);
-
-    this.lastFrameTime = performance.now();
-    this.gameTotalTime = 0;
-    this.elapsedTime = 0;
-    this.state = GAME_STATE.PLAYING;
-    this.player.controls.lock();
   }
 
   spawnMonsterFarAway(monster) {
