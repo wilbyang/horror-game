@@ -722,10 +722,16 @@ export class UIController {
     }
   }
 
+  setHostPending(code) {
+    if (this.hostCodeDisplay) this.hostCodeDisplay.textContent = '....';
+    if (this.btnCopyLink) this.btnCopyLink.style.display = 'none';
+    if (this.hostStatus) this.hostStatus.textContent = 'Registering room on cloud...';
+  }
+
   setHostCode(code) {
     if (this.hostCodeDisplay) this.hostCodeDisplay.textContent = code;
     if (this.btnCopyLink) this.btnCopyLink.style.display = 'inline-block';
-    if (this.hostStatus) this.hostStatus.textContent = 'Room created! Waiting for Player 2 to join...';
+    if (this.hostStatus) this.hostStatus.textContent = `Room [${code}] is ONLINE! Share code or link with Player 2.`;
   }
 
   setHostStatus(text) {

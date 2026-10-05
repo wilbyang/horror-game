@@ -4,8 +4,15 @@ const Peer = (typeof window !== 'undefined' && window.Peer)
   ? window.Peer
   : (PeerModule && (PeerModule.Peer || PeerModule.default || PeerModule));
 
-const ID_PREFIX = 'william-horror-v1-';
+const ID_PREFIX = 'wh2-';
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' }
+];
 
 export class NetworkManager {
   constructor() {
@@ -15,16 +22,16 @@ export class NetworkManager {
     this.roomCode = null;
     this.isConnected = false;
     this.broadcastChannel = null;
+    this.bcInterval = null;
+    this.isDestroyed = false;
 
     this.onConnected = null;
     this.onDisconnected = null;
     this.onMessage = null;
     this.onError = null;
-
-    this.lastSentTimes = {};
   }
 
-  // Generate random 4-letter room code
+  // Generate random 4-letter room code (omitting ambiguous characters like 0, O, 1, I)
   static generateRoomCode() {
     let code = '';
     for (let i = 0; i < 4; i++) {
@@ -35,8 +42,9 @@ export class NetworkManager {
 
   hostRoom(roomCode, callbacks = {}) {
     this.cleanup();
+    this.isDestroyed = false;
     this.isHost = true;
-    this.roomCode = roomCode.toUpperCase().trim();
+    this.roomCode = (roomCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     this.onConnected = callbacks.onConnected;
     this.onDisconnected = callbacks.onDisconnected;
     this.onMessage = callbacks.onMessage;
@@ -55,28 +63,31 @@ export class NetworkManager {
     try {
       this.peer = new Peer(fullPeerId, {
         debug: 1,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
-        }
+        config: { iceServers: ICE_SERVERS }
       });
 
       this.peer.on('open', (id) => {
-        // Room registered on cloud signaling server
+        console.log('[Network] Host room registered on cloud server:', id);
+        if (callbacks.onReady) callbacks.onReady(this.roomCode);
+        if (this.broadcastChannel) {
+          try {
+            this.broadcastChannel.postMessage({ type: 'SYS_BC_HOST_READY' });
+          } catch (e) {}
+        }
       });
 
       this.peer.on('connection', (connection) => {
+        console.log('[Network] Inbound player connection received');
         this.conn = connection;
         this.setupConnection();
       });
 
       this.peer.on('error', (err) => {
+        console.warn('[Network] Host peer error:', err);
         if (err.type === 'unavailable-id') {
-          if (this.onError) this.onError('Room code already in use. Please create a new room.');
+          if (this.onError) this.onError('Room code in use. Please click Create Room again.');
         } else {
-          if (this.onError) this.onError(err.message || 'Network error');
+          if (this.onError) this.onError(err.message || 'Host network error');
         }
       });
     } catch (e) {
@@ -86,8 +97,9 @@ export class NetworkManager {
 
   joinRoom(roomCode, callbacks = {}) {
     this.cleanup();
+    this.isDestroyed = false;
     this.isHost = false;
-    this.roomCode = roomCode.toUpperCase().trim();
+    this.roomCode = (roomCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     this.onConnected = callbacks.onConnected;
     this.onDisconnected = callbacks.onDisconnected;
     this.onMessage = callbacks.onMessage;
@@ -95,55 +107,103 @@ export class NetworkManager {
 
     const targetPeerId = ID_PREFIX + this.roomCode;
 
-    // Local tab-to-tab fallback
+    // Local tab-to-tab fallback with persistent discovery pings
     try {
       this.broadcastChannel = new BroadcastChannel('horror-room-' + this.roomCode);
       this.broadcastChannel.onmessage = (event) => {
         this.handleIncomingData(event.data, 'broadcast');
       };
-      // Send a handshake ping on broadcast channel
-      setTimeout(() => {
+
+      // Send initial join ping
+      this.broadcastChannel.postMessage({ type: 'SYS_BC_JOIN', sender: 'guest' });
+
+      // Keep broadcasting ping until connected
+      this.bcInterval = setInterval(() => {
         if (this.broadcastChannel && !this.isConnected) {
-          this.broadcastChannel.postMessage({ type: 'SYS_BC_JOIN', sender: 'guest' });
+          try {
+            this.broadcastChannel.postMessage({ type: 'SYS_BC_JOIN', sender: 'guest' });
+          } catch (e) {}
+        } else {
+          clearInterval(this.bcInterval);
+          this.bcInterval = null;
         }
-      }, 200);
+      }, 350);
     } catch (e) {}
 
-    try {
-      this.peer = new Peer({
-        debug: 1,
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:global.stun.twilio.com:3478' }
-          ]
-        }
-      });
+    // WebRTC connection with auto-retry loop
+    let retryCount = 0;
+    const maxRetries = 4;
 
-      this.peer.on('open', () => {
-        this.conn = this.peer.connect(targetPeerId, {
-          reliable: true
+    const attemptConnect = () => {
+      if (this.isConnected || this.isDestroyed) return;
+
+      if (callbacks.onProgress) {
+        const text = retryCount === 0
+          ? `Searching for room [${this.roomCode}]...`
+          : `Connecting to room [${this.roomCode}] (attempt ${retryCount + 1}/${maxRetries})...`;
+        callbacks.onProgress(text);
+      }
+
+      if (this.peer) {
+        try { this.peer.destroy(); } catch (e) {}
+        this.peer = null;
+      }
+
+      try {
+        this.peer = new Peer({
+          debug: 1,
+          config: { iceServers: ICE_SERVERS }
         });
-        this.setupConnection();
-      });
 
-      this.peer.on('error', (err) => {
-        if (err.type === 'peer-unavailable') {
-          if (this.onError) this.onError('Room not found. Check the 4-letter code!');
-        } else {
-          if (this.onError) this.onError(err.message || 'Connection failed');
-        }
-      });
-    } catch (e) {
-      if (this.onError) this.onError('Failed to connect: ' + e.message);
-    }
+        this.peer.on('open', (guestId) => {
+          if (this.isConnected || this.isDestroyed) return;
+          console.log('[Network] Guest client initialized:', guestId, '-> connecting to target:', targetPeerId);
+          this.conn = this.peer.connect(targetPeerId, {
+            reliable: true
+          });
+          this.setupConnection();
+        });
+
+        this.peer.on('error', (err) => {
+          if (this.isConnected || this.isDestroyed) return;
+          console.warn('[Network] Guest peer error:', err);
+
+          if (err.type === 'peer-unavailable') {
+            if (retryCount < maxRetries - 1) {
+              retryCount++;
+              setTimeout(attemptConnect, 1200);
+            } else {
+              if (this.onError) {
+                this.onError(`Room [${this.roomCode}] not found. Ensure Host clicked "CREATE ROOM" and the 4-letter code is correct.`);
+              }
+            }
+          } else {
+            if (retryCount < maxRetries - 1) {
+              retryCount++;
+              setTimeout(attemptConnect, 1200);
+            } else {
+              if (this.onError) this.onError(err.message || 'Connection failed. Please verify code.');
+            }
+          }
+        });
+      } catch (e) {
+        if (this.onError) this.onError('Failed to connect: ' + e.message);
+      }
+    };
+
+    attemptConnect();
   }
 
   setupConnection() {
     if (!this.conn) return;
 
     this.conn.on('open', () => {
+      console.log('[Network] WebRTC data channel active!');
       this.isConnected = true;
+      if (this.bcInterval) {
+        clearInterval(this.bcInterval);
+        this.bcInterval = null;
+      }
       if (this.onConnected) this.onConnected(this.isHost);
     });
 
@@ -152,22 +212,26 @@ export class NetworkManager {
     });
 
     this.conn.on('close', () => {
+      console.log('[Network] Peer connection closed');
       this.isConnected = false;
       if (this.onDisconnected) this.onDisconnected();
     });
 
     this.conn.on('error', (err) => {
-      if (this.onError) this.onError(err.message);
+      console.warn('[Network] Conn error:', err);
+      if (!this.isConnected && this.onError) this.onError(err.message);
     });
   }
 
   handleIncomingData(data, source = 'webrtc') {
     if (!data) return;
 
-    // Handle internal broadcast channel handshake
+    // Handle local broadcast channel handshake
     if (data.type === 'SYS_BC_JOIN' && this.isHost) {
       if (this.broadcastChannel) {
-        this.broadcastChannel.postMessage({ type: 'SYS_BC_ACCEPT' });
+        try {
+          this.broadcastChannel.postMessage({ type: 'SYS_BC_ACCEPT' });
+        } catch (e) {}
       }
       if (!this.isConnected) {
         this.isConnected = true;
@@ -179,7 +243,20 @@ export class NetworkManager {
     if (data.type === 'SYS_BC_ACCEPT' && !this.isHost) {
       if (!this.isConnected) {
         this.isConnected = true;
+        if (this.bcInterval) {
+          clearInterval(this.bcInterval);
+          this.bcInterval = null;
+        }
         if (this.onConnected) this.onConnected(this.isHost);
+      }
+      return;
+    }
+
+    if (data.type === 'SYS_BC_HOST_READY' && !this.isHost) {
+      if (this.broadcastChannel && !this.isConnected) {
+        try {
+          this.broadcastChannel.postMessage({ type: 'SYS_BC_JOIN', sender: 'guest' });
+        } catch (e) {}
       }
       return;
     }
@@ -212,7 +289,12 @@ export class NetworkManager {
   }
 
   cleanup() {
+    this.isDestroyed = true;
     this.isConnected = false;
+    if (this.bcInterval) {
+      clearInterval(this.bcInterval);
+      this.bcInterval = null;
+    }
     if (this.conn) {
       try { this.conn.close(); } catch (e) {}
       this.conn = null;

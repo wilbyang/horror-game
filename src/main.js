@@ -170,9 +170,14 @@ class Game {
     const code = NetworkManager.generateRoomCode();
     this.coopRoomCode = code;
     this.isCoopHost = true;
-    this.ui.setHostCode(code);
+    this.ui.setHostPending(code);
 
     this.network.hostRoom(code, {
+      onReady: (confirmedCode) => {
+        this.coopRoomCode = confirmedCode;
+        this.ui.setHostCode(confirmedCode);
+        this.ui.notify(`Room [${confirmedCode}] is online! Share code with your teammate.`, 4000);
+      },
       onConnected: () => {
         this.coopConnected = true;
         this.ui.setCoopConnected('host', true);
@@ -193,20 +198,24 @@ class Game {
   }
 
   joinCoopRoom(code) {
-    if (!code || code.length < 3) {
-      this.ui.setJoinStatus('Please enter a valid room code!');
+    const cleanCode = (code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!cleanCode || cleanCode.length < 3) {
+      this.ui.setJoinStatus('Please enter a valid 4-letter room code!');
       return;
     }
-    this.coopRoomCode = code;
+    this.coopRoomCode = cleanCode;
     this.isCoopHost = false;
-    this.ui.setJoinStatus(`Connecting to room ${code}...`);
+    this.ui.setJoinStatus(`Searching for room [${cleanCode}]...`);
 
-    this.network.joinRoom(code, {
+    this.network.joinRoom(cleanCode, {
+      onProgress: (statusText) => {
+        this.ui.setJoinStatus(statusText);
+      },
       onConnected: () => {
         this.coopConnected = true;
         this.ui.setCoopConnected('guest', true);
         this.sound.playPingBeacon();
-        this.ui.notify(`Connected to Host room ${code}! Waiting for Host to start...`, 4500);
+        this.ui.notify(`Connected to Host room [${cleanCode}]! Waiting for Host to start...`, 4500);
       },
       onDisconnected: () => {
         this.coopConnected = false;
@@ -217,6 +226,7 @@ class Game {
       onMessage: (msg) => this.handleNetworkMessage(msg),
       onError: (err) => {
         this.ui.setJoinStatus(err);
+        this.ui.notify(err, 4500);
       }
     });
   }
