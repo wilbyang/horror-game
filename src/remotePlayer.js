@@ -53,7 +53,7 @@ export class RemotePlayer {
 
     // Root Body
     this.body = new THREE.Group();
-    this.body.position.y = 0.82;
+    this.body.position.y = 0.95;
 
     // Torso
     const torsoGeo = new THREE.BoxGeometry(0.5, 0.65, 0.3);
@@ -176,7 +176,7 @@ export class RemotePlayer {
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
     this.nameSprite = new THREE.Sprite(spriteMat);
-    this.nameSprite.position.set(0, 1.85, 0);
+    this.nameSprite.position.set(0, 2.05, 0);
     this.nameSprite.scale.set(1.4, 0.35, 1);
     this.group.add(this.nameSprite);
   }
@@ -188,17 +188,17 @@ export class RemotePlayer {
     if (isDowned) {
       // Collapse to floor
       this.body.rotation.z = Math.PI / 2.3;
-      this.body.position.y = 0.25;
+      this.body.position.y = 0.22;
       if (this.nameSprite) {
-        this.nameSprite.position.set(0, 0.9, 0);
+        this.nameSprite.position.set(0, 0.75, 0);
       }
       this.spotLight.intensity = 1.0;
     } else {
       // Revived back upright
       this.body.rotation.z = 0;
-      this.body.position.y = 0.82;
+      this.body.position.y = 0.95;
       if (this.nameSprite) {
-        this.nameSprite.position.set(0, 1.85, 0);
+        this.nameSprite.position.set(0, 2.05, 0);
       }
       this.spotLight.intensity = 4.5;
     }
@@ -211,9 +211,14 @@ export class RemotePlayer {
   }
 
   update(delta, playerPos = null) {
-    // Interpolate position smoothly
+    // Keep feet strictly pinned to the ground (y = 0)
+    this.targetPos.y = 0;
+
+    // Interpolate horizontal position smoothly
     const prevPos = this.group.position.clone();
-    this.group.position.lerp(this.targetPos, 0.24);
+    this.group.position.x = THREE.MathUtils.lerp(this.group.position.x, this.targetPos.x, 0.24);
+    this.group.position.z = THREE.MathUtils.lerp(this.group.position.z, this.targetPos.z, 0.24);
+    this.group.position.y = 0;
 
     // Interpolate rotation
     const curRotY = this.group.rotation.y;

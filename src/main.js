@@ -263,7 +263,8 @@ class Game {
 
       case 'PLAYER_MOVE':
         if (this.remotePlayer) {
-          this.remotePlayer.targetPos.set(msg.x, msg.y, msg.z);
+          // Survivor avatar is grounded on the floor (y = 0)
+          this.remotePlayer.targetPos.set(msg.x, 0, msg.z);
           this.remotePlayer.targetYaw = msg.yaw;
           this.remotePlayer.targetPitch = msg.pitch;
           this.remotePlayer.isSprinting = msg.isSprinting;
@@ -1180,7 +1181,7 @@ class Game {
         // Broadcast to teammate that we are downed
         this.network.send({
           type: 'DOWNED_ALERT',
-          position: [this.player.camera.position.x, this.player.camera.position.y, this.player.camera.position.z]
+          position: [this.player.camera.position.x, 0, this.player.camera.position.z]
         });
 
         // Repel the monster so it doesn't continuously body-block the downed player
