@@ -380,36 +380,160 @@ export class Maze {
 
   addTorches() {
     const s = this.size;
-    // Place atmospheric sconces at crossroads
+    const candidateDirs = [
+      { dx: 0, dz: -1 }, // North
+      { dx: 0, dz: 1 },  // South
+      { dx: -1, dz: 0 }, // West
+      { dx: 1, dz: 0 }   // East
+    ];
+
+    // Shared materials for all wall sconces
+    const ironMat = new THREE.MeshStandardMaterial({
+      color: 0x18181d,
+      metalness: 0.85,
+      roughness: 0.45
+    });
+
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: (this.worldLevel === 2) ? 0x1f1412 : 0x3d291a,
+      roughness: 0.85,
+      metalness: 0.1
+    });
+
+    const wrapMat = new THREE.MeshStandardMaterial({
+      color: (this.worldLevel === 2) ? 0x22060c : 0x1c140d,
+      roughness: 0.95
+    });
+
+    const flameMat = new THREE.MeshBasicMaterial({
+      color: (this.worldLevel === 2) ? 0xff2255 : 0xff9922
+    });
+
+    const flameCoreMat = new THREE.MeshBasicMaterial({
+      color: (this.worldLevel === 2) ? 0xff88aa : 0xffe066
+    });
+
     const torchSpacing = 5;
+    const placedWallSpots = new Set();
+
     for (let z = 3; z < s - 3; z += torchSpacing) {
       for (let x = 3; x < s - 3; x += torchSpacing) {
-        if (this.grid[z][x] === 0) {
-          const wPos = this.gridToWorld(x, z);
+        // Find a walkable corridor cell near (x, z) that has an adjacent wall
+        let targetX = -1, targetZ = -1, wallDir = null;
 
-          // Wall mount
-          const mountGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.4);
-          const mountMat = new THREE.MeshStandardMaterial({ color: 0x221a10, metalness: 0.8 });
-          const mount = new THREE.Mesh(mountGeo, mountMat);
-          mount.position.set(wPos.x, 2.0, wPos.z);
-          this.group.add(mount);
+        for (let rz = -1; rz <= 1 && !wallDir; rz++) {
+          for (let rx = -1; rx <= 1 && !wallDir; rx++) {
+            const cx = x + rx;
+            const cz = z + rz;
+            if (cx >= 1 && cx < s - 1 && cz >= 1 && cz < s - 1 && this.grid[cz][cx] === 0) {
+              const foundWall = candidateDirs.find(d => {
+                const nx = cx + d.dx;
+                const nz = cz + d.dz;
+                return nx >= 0 && nx < s && nz >= 0 && nz < s && this.grid[nz][nx] === 1;
+              });
+              if (foundWall) {
+                targetX = cx;
+                targetZ = cz;
+                wallDir = foundWall;
+              }
+            }
+          }
+        }
 
-          // Ember bulb
-          const bulbGeo = new THREE.SphereGeometry(0.1, 8, 8);
-          const bulbMat = new THREE.MeshBasicMaterial({ color: (this.worldLevel === 2) ? 0xff2255 : 0xff7733 });
-          const bulb = new THREE.Mesh(bulbGeo, bulbMat);
-          bulb.position.set(wPos.x, 2.2, wPos.z);
-          this.group.add(bulb);
+        if (wallDir && targetX !== -1) {
+          const wPos = this.gridToWorld(targetX, targetZ);
+          const wallX = wPos.x + wallDir.dx * (CELL_SIZE / 2);
+          const wallZ = wPos.z + wallDir.dz * (CELL_SIZE / 2);
+          const spotKey = `${Math.round(wallX)},${Math.round(wallZ)}`;
 
-          // Torchlight (Abyssal Crimson in World 2, Warm Amber in World 1)
+          if (placedWallSpots.has(spotKey)) continue;
+          placedWallSpots.add(spotKey);
+
+          const sconceGroup = new THREE.Group();
+          sconceGroup.position.set(wallX, 2.05, wallZ);
+          sconceGroup.rotation.y = Math.atan2(-wallDir.dx, -wallDir.dz);
+
+          // 1. Forged Iron Backplate mounted flush against stone wall surface
+          const backplateGeo = new THREE.BoxGeometry(0.22, 0.36, 0.04);
+          const backplate = new THREE.Mesh(backplateGeo, ironMat);
+          backplate.position.set(0, 0, 0.02);
+          sconceGroup.add(backplate);
+
+          // Iron mounting studs / rivets
+          const rivetGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.02, 6);
+          const rivetTop = new THREE.Mesh(rivetGeo, ironMat);
+          rivetTop.rotation.x = Math.PI / 2;
+          rivetTop.position.set(0, 0.13, 0.045);
+          sconceGroup.add(rivetTop);
+
+          const rivetBottom = new THREE.Mesh(rivetGeo, ironMat);
+          rivetBottom.rotation.x = Math.PI / 2;
+          rivetBottom.position.set(0, -0.13, 0.045);
+          sconceGroup.add(rivetBottom);
+
+          // 2. Iron support arm extending out from wall into corridor
+          const armGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.28, 8);
+          const arm = new THREE.Mesh(armGeo, ironMat);
+          arm.rotation.x = Math.PI / 2;
+          arm.position.set(0, -0.04, 0.16);
+          sconceGroup.add(arm);
+
+          // Diagonal support brace under the arm
+          const braceGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.22, 6);
+          const brace = new THREE.Mesh(braceGeo, ironMat);
+          brace.rotation.x = -Math.PI / 4;
+          brace.position.set(0, -0.11, 0.11);
+          sconceGroup.add(brace);
+
+          // 3. Forged iron torch holder ring / cup
+          const cupGeo = new THREE.CylinderGeometry(0.065, 0.045, 0.10, 8, 1, true);
+          const cup = new THREE.Mesh(cupGeo, ironMat);
+          cup.position.set(0, 0.02, 0.30);
+          sconceGroup.add(cup);
+
+          // 4. Wooden torch shaft resting inside holder
+          const shaftGeo = new THREE.CylinderGeometry(0.028, 0.02, 0.44, 8);
+          const shaft = new THREE.Mesh(shaftGeo, woodMat);
+          shaft.rotation.x = 0.18;
+          shaft.position.set(0, 0.10, 0.32);
+          sconceGroup.add(shaft);
+
+          // 5. Charred cloth / pitch wrapped torch head
+          const headGeo = new THREE.CylinderGeometry(0.055, 0.042, 0.14, 8);
+          const head = new THREE.Mesh(headGeo, wrapMat);
+          head.rotation.x = 0.18;
+          head.position.set(0, 0.28, 0.35);
+          sconceGroup.add(head);
+
+          // 6. Glowing flame meshes
+          const flameGeo = new THREE.ConeGeometry(0.065, 0.22, 8);
+          const flame = new THREE.Mesh(flameGeo, flameMat);
+          flame.position.set(0, 0.42, 0.37);
+          sconceGroup.add(flame);
+
+          const coreGeo = new THREE.SphereGeometry(0.038, 8, 8);
+          const flameCore = new THREE.Mesh(coreGeo, flameCoreMat);
+          flameCore.position.set(0, 0.38, 0.37);
+          sconceGroup.add(flameCore);
+
+          // 7. Warm flickering torch point light
           const torchColor = (this.worldLevel === 2) ? 0xff1844 : 0xff8833;
-          const torchLight = new THREE.PointLight(torchColor, (this.worldLevel === 2) ? 2.1 : 1.8, 14.0, 1.5);
-          torchLight.position.set(wPos.x, 2.3, wPos.z);
-          this.group.add(torchLight);
+          const torchLight = new THREE.PointLight(
+            torchColor,
+            (this.worldLevel === 2) ? 2.3 : 1.9,
+            15.0,
+            1.4
+          );
+          torchLight.position.set(0, 0.45, 0.40);
+          sconceGroup.add(torchLight);
+
+          this.group.add(sconceGroup);
 
           this.torches.push({
             light: torchLight,
-            baseIntensity: (this.worldLevel === 2) ? 2.1 : 1.8,
+            flame: flame,
+            flameCore: flameCore,
+            baseIntensity: (this.worldLevel === 2) ? 2.3 : 1.9,
             offset: Math.random() * 10
           });
         }
@@ -420,8 +544,16 @@ export class Maze {
   updateTorches(time) {
     for (const t of this.torches) {
       // Subtle organic flame flicker
-      const flicker = Math.sin(time * 8 + t.offset) * 0.2 + Math.cos(time * 19 + t.offset) * 0.12;
+      const flicker = Math.sin(time * 8 + t.offset) * 0.25 + Math.cos(time * 19 + t.offset) * 0.15;
       t.light.intensity = Math.max(1.1, t.baseIntensity + flicker);
+      if (t.flame) {
+        t.flame.scale.y = 1.0 + flicker * 0.35;
+        t.flame.scale.x = 1.0 - flicker * 0.15;
+        t.flame.scale.z = 1.0 - flicker * 0.15;
+      }
+      if (t.flameCore) {
+        t.flameCore.scale.setScalar(1.0 + flicker * 0.2);
+      }
     }
   }
 
