@@ -581,6 +581,7 @@ class Game {
           name: k.name,
           color: k.color,
           grid: k.grid,
+          wallDir: k.wallDir,
           pos: { x: k.pos.x, y: k.pos.y, z: k.pos.z }
         })),
         exitPos: { x: this.maze.exitPos.x, y: this.maze.exitPos.y, z: this.maze.exitPos.z },
@@ -694,6 +695,7 @@ class Game {
         name: info.name,
         color: info.color,
         grid: info.grid,
+        wallDir: info.wallDir,
         pos: new THREE.Vector3(info.pos.x, info.pos.y || 0, info.pos.z)
       }));
       this.maze.build3DWorld(this.scene);
@@ -1084,18 +1086,18 @@ class Game {
       key.update(time);
 
       if (!key.collected) {
-        const dist = key.group.position.distanceTo(playerPos);
-        if (dist < nearestKeyDist) {
-          nearestKeyDist = dist;
+        const horizDist = Math.hypot(key.group.position.x - playerPos.x, key.group.position.z - playerPos.z);
+        if (horizDist < nearestKeyDist) {
+          nearestKeyDist = horizDist;
         }
 
         // Check if looking near key
-        if (dist < 3.5) {
+        if (horizDist < 3.8) {
           nearInteractable = true;
         }
 
         // Collect key
-        if (dist < 1.8) {
+        if (horizDist < 2.2) {
           key.collected = true;
           this.scene.remove(key.group);
 

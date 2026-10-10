@@ -170,12 +170,24 @@ export class Maze {
       });
       const k5 = allWalkable[0] || candTL[1] || { x: midOdd, z: 1 };
 
+      const buildKeyPos = (id, name, color, k) => {
+        const wallDir = this.findAdjacentWallDir(k.x, k.z);
+        return {
+          id,
+          name,
+          color,
+          grid: k,
+          wallDir,
+          pos: this.gridToWorld(k.x, k.z)
+        };
+      };
+
       this.keyPositions = [
-        { id: 'amethyst', name: 'Void Amethyst Key', color: 0xa855f7, pos: this.gridToWorld(k1.x, k1.z), grid: k1 },
-        { id: 'emerald', name: 'Soul Emerald Key', color: 0x10b981, pos: this.gridToWorld(k2.x, k2.z), grid: k2 },
-        { id: 'crimson', name: 'Abyssal Eye Key', color: 0xf43f5e, pos: this.gridToWorld(k3.x, k3.z), grid: k3 },
-        { id: 'infernal', name: 'Infernal Core Key', color: 0xf97316, pos: this.gridToWorld(k4.x, k4.z), grid: k4 },
-        { id: 'azure', name: 'Nether Azure Key', color: 0x06b6d4, pos: this.gridToWorld(k5.x, k5.z), grid: k5 }
+        buildKeyPos('amethyst', 'Void Amethyst Key', 0xa855f7, k1),
+        buildKeyPos('emerald', 'Soul Emerald Key', 0x10b981, k2),
+        buildKeyPos('crimson', 'Abyssal Eye Key', 0xf43f5e, k3),
+        buildKeyPos('infernal', 'Infernal Core Key', 0xf97316, k4),
+        buildKeyPos('azure', 'Nether Azure Key', 0x06b6d4, k5)
       ];
     } else {
       // 3 Keys for World 1
@@ -216,12 +228,42 @@ export class Maze {
       const k2 = candidatesQ2[0] || { x: s - 2, z: 1 };
       const k3 = candidatesQ3[0] || { x: s - 2, z: s - 2 };
 
+      const buildKeyPos = (id, name, color, k) => {
+        const wallDir = this.findAdjacentWallDir(k.x, k.z);
+        return {
+          id,
+          name,
+          color,
+          grid: k,
+          wallDir,
+          pos: this.gridToWorld(k.x, k.z)
+        };
+      };
+
       this.keyPositions = [
-        { id: 'ruby', name: 'Blood Ruby Key', color: 0xef4444, pos: this.gridToWorld(k1.x, k1.z), grid: k1 },
-        { id: 'sapphire', name: 'Void Sapphire Key', color: 0x3b82f6, pos: this.gridToWorld(k2.x, k2.z), grid: k2 },
-        { id: 'topaz', name: 'Elder Sun Key', color: 0xf59e0b, pos: this.gridToWorld(k3.x, k3.z), grid: k3 }
+        buildKeyPos('ruby', 'Blood Ruby Key', 0xef4444, k1),
+        buildKeyPos('sapphire', 'Void Sapphire Key', 0x3b82f6, k2),
+        buildKeyPos('topaz', 'Elder Sun Key', 0xf59e0b, k3)
       ];
     }
+  }
+
+  findAdjacentWallDir(gx, gz) {
+    const s = this.size;
+    const dirs = [
+      { dx: 0, dz: -1 }, // North
+      { dx: 0, dz: 1 },  // South
+      { dx: -1, dz: 0 }, // West
+      { dx: 1, dz: 0 }   // East
+    ];
+    for (const d of dirs) {
+      const nx = gx + d.dx;
+      const nz = gz + d.dz;
+      if (nx >= 0 && nx < s && nz >= 0 && nz < s && this.grid[nz][nx] === 1) {
+        return d;
+      }
+    }
+    return { dx: 0, dz: -1 };
   }
 
   build3DWorld(scene) {
@@ -387,21 +429,33 @@ export class Maze {
       { dx: 1, dz: 0 }   // East
     ];
 
-    // Shared materials for all wall sconces
+    // Shared materials for all wall sconces - gunmetal iron with visible highlights
     const ironMat = new THREE.MeshStandardMaterial({
-      color: 0x18181d,
+      color: 0x2e303b,
       metalness: 0.85,
-      roughness: 0.45
+      roughness: 0.35
+    });
+
+    const rivetMat = new THREE.MeshStandardMaterial({
+      color: 0x585c6d,
+      metalness: 0.9,
+      roughness: 0.2
+    });
+
+    const backplateWoodMat = new THREE.MeshStandardMaterial({
+      color: (this.worldLevel === 2) ? 0x240e14 : 0x3a281a,
+      roughness: 0.9,
+      metalness: 0.05
     });
 
     const woodMat = new THREE.MeshStandardMaterial({
-      color: (this.worldLevel === 2) ? 0x1f1412 : 0x3d291a,
+      color: (this.worldLevel === 2) ? 0x1f1412 : 0x4a3220,
       roughness: 0.85,
       metalness: 0.1
     });
 
     const wrapMat = new THREE.MeshStandardMaterial({
-      color: (this.worldLevel === 2) ? 0x22060c : 0x1c140d,
+      color: (this.worldLevel === 2) ? 0x26080e : 0x1e1711,
       roughness: 0.95
     });
 
@@ -450,73 +504,89 @@ export class Maze {
           placedWallSpots.add(spotKey);
 
           const sconceGroup = new THREE.Group();
-          sconceGroup.position.set(wallX, 2.05, wallZ);
+          sconceGroup.position.set(wallX, 1.95, wallZ);
           sconceGroup.rotation.y = Math.atan2(-wallDir.dx, -wallDir.dz);
 
-          // 1. Forged Iron Backplate mounted flush against stone wall surface
-          const backplateGeo = new THREE.BoxGeometry(0.22, 0.36, 0.04);
-          const backplate = new THREE.Mesh(backplateGeo, ironMat);
+          // 1. Heavy Wooden Shield Wall Plate (sits flush against stone wall face)
+          const backplateGeo = new THREE.BoxGeometry(0.34, 0.92, 0.06);
+          const backplate = new THREE.Mesh(backplateGeo, backplateWoodMat);
           backplate.position.set(0, 0, 0.02);
           sconceGroup.add(backplate);
 
-          // Iron mounting studs / rivets
-          const rivetGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.02, 6);
-          const rivetTop = new THREE.Mesh(rivetGeo, ironMat);
-          rivetTop.rotation.x = Math.PI / 2;
-          rivetTop.position.set(0, 0.13, 0.045);
-          sconceGroup.add(rivetTop);
+          // 2. Central Forged Iron Spine Strip extending along wall plate
+          const spineGeo = new THREE.BoxGeometry(0.10, 1.08, 0.05);
+          const spine = new THREE.Mesh(spineGeo, ironMat);
+          spine.position.set(0, 0, 0.05);
+          sconceGroup.add(spine);
 
-          const rivetBottom = new THREE.Mesh(rivetGeo, ironMat);
-          rivetBottom.rotation.x = Math.PI / 2;
-          rivetBottom.position.set(0, -0.13, 0.045);
-          sconceGroup.add(rivetBottom);
+          // Top and Bottom Forged Iron Wall Clamps
+          const clampGeo = new THREE.BoxGeometry(0.36, 0.08, 0.06);
+          const clampTop = new THREE.Mesh(clampGeo, ironMat);
+          clampTop.position.set(0, 0.35, 0.05);
+          sconceGroup.add(clampTop);
 
-          // 2. Iron support arm extending out from wall into corridor
-          const armGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.28, 8);
+          const clampBottom = new THREE.Mesh(clampGeo, ironMat);
+          clampBottom.position.set(0, -0.35, 0.05);
+          sconceGroup.add(clampBottom);
+
+          // 4 Large Highlighted Steel Studs/Rivets on Wall Clamps
+          const rivetGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.03, 8);
+          [
+            [-0.13, 0.35], [0.13, 0.35],
+            [-0.13, -0.35], [0.13, -0.35]
+          ].forEach(([rx, ry]) => {
+            const rivet = new THREE.Mesh(rivetGeo, rivetMat);
+            rivet.rotation.x = Math.PI / 2;
+            rivet.position.set(rx, ry, 0.075);
+            sconceGroup.add(rivet);
+          });
+
+          // 3. Thick Forged Iron Support Arm anchored to wall spine
+          const armGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.18, 8);
           const arm = new THREE.Mesh(armGeo, ironMat);
           arm.rotation.x = Math.PI / 2;
-          arm.position.set(0, -0.04, 0.16);
+          arm.position.set(0, 0.02, 0.11);
           sconceGroup.add(arm);
 
-          // Diagonal support brace under the arm
-          const braceGeo = new THREE.CylinderGeometry(0.016, 0.016, 0.22, 6);
+          // Heavy 45-degree Diagonal Support Strut from wall plate to torch cup
+          const braceGeo = new THREE.CylinderGeometry(0.022, 0.022, 0.22, 8);
           const brace = new THREE.Mesh(braceGeo, ironMat);
           brace.rotation.x = -Math.PI / 4;
-          brace.position.set(0, -0.11, 0.11);
+          brace.position.set(0, -0.09, 0.09);
           sconceGroup.add(brace);
 
-          // 3. Forged iron torch holder ring / cup
-          const cupGeo = new THREE.CylinderGeometry(0.065, 0.045, 0.10, 8, 1, true);
+          // 4. Forged Iron Sconce Cup
+          const cupGeo = new THREE.CylinderGeometry(0.065, 0.045, 0.12, 8, 1, true);
           const cup = new THREE.Mesh(cupGeo, ironMat);
-          cup.position.set(0, 0.02, 0.30);
+          cup.position.set(0, 0.06, 0.18);
           sconceGroup.add(cup);
 
-          // 4. Wooden torch shaft resting inside holder
-          const shaftGeo = new THREE.CylinderGeometry(0.028, 0.02, 0.44, 8);
+          // 5. Wooden Torch Shaft resting inside cup
+          const shaftGeo = new THREE.CylinderGeometry(0.028, 0.022, 0.42, 8);
           const shaft = new THREE.Mesh(shaftGeo, woodMat);
-          shaft.rotation.x = 0.18;
-          shaft.position.set(0, 0.10, 0.32);
+          shaft.rotation.x = 0.12;
+          shaft.position.set(0, 0.18, 0.20);
           sconceGroup.add(shaft);
 
-          // 5. Charred cloth / pitch wrapped torch head
+          // 6. Charred Wrapped Torch Head
           const headGeo = new THREE.CylinderGeometry(0.055, 0.042, 0.14, 8);
           const head = new THREE.Mesh(headGeo, wrapMat);
-          head.rotation.x = 0.18;
-          head.position.set(0, 0.28, 0.35);
+          head.rotation.x = 0.12;
+          head.position.set(0, 0.34, 0.22);
           sconceGroup.add(head);
 
-          // 6. Glowing flame meshes
-          const flameGeo = new THREE.ConeGeometry(0.065, 0.22, 8);
+          // 7. Glowing Flame Meshes
+          const flameGeo = new THREE.ConeGeometry(0.07, 0.24, 8);
           const flame = new THREE.Mesh(flameGeo, flameMat);
-          flame.position.set(0, 0.42, 0.37);
+          flame.position.set(0, 0.48, 0.24);
           sconceGroup.add(flame);
 
-          const coreGeo = new THREE.SphereGeometry(0.038, 8, 8);
+          const coreGeo = new THREE.SphereGeometry(0.04, 8, 8);
           const flameCore = new THREE.Mesh(coreGeo, flameCoreMat);
-          flameCore.position.set(0, 0.38, 0.37);
+          flameCore.position.set(0, 0.44, 0.24);
           sconceGroup.add(flameCore);
 
-          // 7. Warm flickering torch point light
+          // 8. Warm Flickering Torch Point Light (brightly washes wall plate and masonry)
           const torchColor = (this.worldLevel === 2) ? 0xff1844 : 0xff8833;
           const torchLight = new THREE.PointLight(
             torchColor,
@@ -524,7 +594,7 @@ export class Maze {
             15.0,
             1.4
           );
-          torchLight.position.set(0, 0.45, 0.40);
+          torchLight.position.set(0, 0.50, 0.22);
           sconceGroup.add(torchLight);
 
           this.group.add(sconceGroup);

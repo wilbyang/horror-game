@@ -7,114 +7,176 @@ export class KeyItem {
     this.id = info.id;
     this.name = info.name;
     this.colorHex = info.color;
-    this.pos = (info.pos && typeof info.pos.clone === 'function')
+    this.wallDir = info.wallDir || { dx: 0, dz: -1 };
+
+    const basePos = (info.pos && typeof info.pos.clone === 'function')
       ? info.pos.clone()
       : new THREE.Vector3(info.pos.x, info.pos.y || 0, info.pos.z);
-    this.pos.y = 1.3; // Floating waist height
 
+    // Position the shrine directly flush against the adjacent stone wall
+    const wallX = basePos.x + this.wallDir.dx * (CELL_SIZE / 2 - 0.28);
+    const wallZ = basePos.z + this.wallDir.dz * (CELL_SIZE / 2 - 0.28);
+
+    this.pos = new THREE.Vector3(wallX, 0, wallZ);
     this.collected = false;
     this.group = new THREE.Group();
     this.group.position.copy(this.pos);
+    // Face out from the wall into the room/corridor
+    this.group.rotation.y = Math.atan2(-this.wallDir.dx, -this.wallDir.dz);
 
     this.buildMesh();
   }
 
   buildMesh() {
-    // Ornate 3D Key Model
+    // 1. Stone Wall Shrine Backplate & Arch (mounted flush against the wall)
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0x181824,
+      roughness: 0.92,
+      metalness: 0.08
+    });
+
+    const tableMat = new THREE.MeshStandardMaterial({
+      color: 0x262838,
+      roughness: 0.75,
+      metalness: 0.25
+    });
+
+    const ironStandMat = new THREE.MeshStandardMaterial({
+      color: 0x363948,
+      metalness: 0.85,
+      roughness: 0.35
+    });
+
+    const runeMat = new THREE.MeshBasicMaterial({
+      color: this.colorHex,
+      transparent: true,
+      opacity: 0.85
+    });
+
+    // Wall backplate
+    const wallBack = new THREE.Mesh(new THREE.BoxGeometry(1.20, 2.50, 0.16), stoneMat);
+    wallBack.position.set(0, 1.25, -0.16);
+    this.group.add(wallBack);
+
+    // Carved arch crown trim
+    const archTrim = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.18, 0.22), stoneMat);
+    archTrim.position.set(0, 2.45, -0.12);
+    this.group.add(archTrim);
+
+    // Glowing Runic Glyph on the wall backplate
+    const runeBack = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.55), runeMat);
+    runeBack.position.set(0, 1.65, -0.07);
+    this.group.add(runeBack);
+    this.runeBack = runeBack;
+
+    // 2. Solid Stone Altar Table (firmly seated on floor at y=0, no floating)
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.10, 0.22, 0.75), stoneMat);
+    plinth.position.set(0, 0.11, 0.18);
+    this.group.add(plinth);
+
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.44, 0.72, 8), stoneMat);
+    pedestal.position.set(0, 0.55, 0.20);
+    this.group.add(pedestal);
+
+    const table = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.14, 0.68), tableMat);
+    table.position.set(0, 0.98, 0.20);
+    this.group.add(table);
+
+    // Glowing runic inlay ring on altar table
+    const runeRing = new THREE.Mesh(new THREE.RingGeometry(0.24, 0.32, 24), runeMat);
+    runeRing.rotation.x = -Math.PI / 2;
+    runeRing.position.set(0, 1.055, 0.20);
+    this.group.add(runeRing);
+
+    // Floor runic circle
+    const floorRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 1.3, 32),
+      new THREE.MeshBasicMaterial({ color: this.colorHex, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })
+    );
+    floorRing.rotation.x = -Math.PI / 2;
+    floorRing.position.set(0, 0.02, 0.20);
+    this.group.add(floorRing);
+
+    // 3. Forged Metal Key Stand on Altar
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.14, 8), ironStandMat);
+    cup.position.set(0, 1.12, 0.20);
+    this.group.add(cup);
+
+    // 4. Ornate 3D Key Model firmly seated in the stand (NOT floating)
     const keyMat = new THREE.MeshStandardMaterial({
       color: this.colorHex,
       emissive: this.colorHex,
-      emissiveIntensity: 0.6,
+      emissiveIntensity: 0.7,
       metalness: 0.9,
       roughness: 0.2
     });
 
-    // Key Ring / Bow
-    const ringGeo = new THREE.TorusGeometry(0.2, 0.04, 16, 32);
-    const ring = new THREE.Mesh(ringGeo, keyMat);
-    ring.rotation.x = Math.PI / 2;
-    this.group.add(ring);
-
-    // Key Gem / Jewel inside ring
-    const gemGeo = new THREE.OctahedronGeometry(0.12, 0);
     const gemMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: this.colorHex,
-      emissiveIntensity: 1.5,
+      emissiveIntensity: 1.6,
       roughness: 0.1,
       metalness: 0.1
     });
-    const gem = new THREE.Mesh(gemGeo, gemMat);
-    this.group.add(gem);
 
-    // Key Shaft
-    const shaftGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.6, 12);
-    const shaft = new THREE.Mesh(shaftGeo, keyMat);
-    shaft.position.y = -0.38;
+    // Key Shaft resting in holder
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.55, 12), keyMat);
+    shaft.position.set(0, 1.35, 0.18);
+    shaft.rotation.x = -0.12;
     this.group.add(shaft);
 
-    // Key Bit / Teeth
+    // Key Teeth
     const tooth1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.04), keyMat);
-    tooth1.position.set(0.08, -0.58, 0);
+    tooth1.position.set(0.08, 1.22, 0.20);
     this.group.add(tooth1);
 
     const tooth2 = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.06, 0.04), keyMat);
-    tooth2.position.set(0.1, -0.48, 0);
+    tooth2.position.set(0.1, 1.30, 0.19);
     this.group.add(tooth2);
 
-    // Powerful glowing point light to illuminate long corridors
-    this.light = new THREE.PointLight(this.colorHex, 4.8, 26.0, 1.2);
+    // Key Ring / Bow
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.20, 0.042, 16, 32), keyMat);
+    ring.position.set(0, 1.62, 0.15);
+    this.group.add(ring);
+
+    // Key Gem / Jewel inside ring
+    const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), gemMat);
+    gem.position.set(0, 1.62, 0.15);
+    this.group.add(gem);
+    this.gem = gem;
+
+    // 5. Powerful Glowing Point Light
+    this.light = new THREE.PointLight(this.colorHex, 4.4, 25.0, 1.3);
+    this.light.position.set(0, 1.70, 0.22);
     this.group.add(this.light);
 
-    // Vertical ethereal light beacon column from floor to ceiling
-    const beaconGeo = new THREE.CylinderGeometry(0.15, 0.48, WALL_HEIGHT, 16, 1, true);
+    // 6. Vertical Light Beacon Column from altar up to ceiling
+    const beaconHeight = WALL_HEIGHT - 1.0;
+    const beaconGeo = new THREE.CylinderGeometry(0.12, 0.38, beaconHeight, 16, 1, true);
     const beaconMat = new THREE.MeshBasicMaterial({
       color: this.colorHex,
       transparent: true,
-      opacity: 0.38,
+      opacity: 0.32,
       side: THREE.DoubleSide,
       depthWrite: false
     });
     this.beaconMesh = new THREE.Mesh(beaconGeo, beaconMat);
-    this.beaconMesh.position.y = (WALL_HEIGHT / 2) - this.pos.y;
+    this.beaconMesh.position.set(0, 1.0 + beaconHeight / 2, 0.20);
     this.group.add(this.beaconMesh);
-
-    // Floor runic circle
-    const runeFloor = new THREE.Mesh(
-      new THREE.RingGeometry(0.7, 1.4, 32),
-      new THREE.MeshBasicMaterial({ color: this.colorHex, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false })
-    );
-    runeFloor.position.y = -this.pos.y + 0.05;
-    runeFloor.rotation.x = -Math.PI / 2;
-    this.group.add(runeFloor);
-    this.runeFloor = runeFloor;
-
-    // Floating pedestal/altar beneath the key
-    const pedestalGeo = new THREE.CylinderGeometry(0.35, 0.45, 0.65, 8);
-    const pedestalMat = new THREE.MeshStandardMaterial({ color: 0x181820, roughness: 0.9 });
-    const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
-    pedestal.position.y = -0.95;
-    this.group.add(pedestal);
-
-    // Altar runic ring
-    const runeRingGeo = new THREE.RingGeometry(0.48, 0.52, 24);
-    const runeMat = new THREE.MeshBasicMaterial({ color: this.colorHex, side: THREE.DoubleSide });
-    const runeRing = new THREE.Mesh(runeRingGeo, runeMat);
-    runeRing.position.y = -0.62;
-    runeRing.rotation.x = -Math.PI / 2;
-    this.group.add(runeRing);
   }
 
   update(time) {
     if (this.collected) return;
-    // Gentle floating and rotation
-    this.group.rotation.y = time * 1.5;
-    this.group.position.y = this.pos.y + Math.sin(time * 2.5) * 0.1;
-    this.light.intensity = 4.2 + Math.sin(time * 3.5) * 0.8;
+    // Firmly grounded & wall-anchored: physical position does NOT float
+    this.light.intensity = 4.0 + Math.sin(time * 3.5) * 0.7;
+
+    if (this.gem) {
+      this.gem.material.emissiveIntensity = 1.3 + Math.sin(time * 3.0) * 0.4;
+    }
 
     if (this.beaconMesh) {
-      this.beaconMesh.rotation.y = -time * 0.8;
-      this.beaconMesh.material.opacity = 0.28 + Math.sin(time * 3) * 0.12;
+      this.beaconMesh.rotation.y = time * 0.6;
+      this.beaconMesh.material.opacity = 0.24 + Math.sin(time * 2.8) * 0.08;
     }
   }
 }
